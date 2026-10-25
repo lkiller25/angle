@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#060808">
+  <meta name="description" content="ANGLE. Reviens au moment du choix. Un débrief guidé de tes décisions Fortnite Ranked, sans IA ni verdict automatique.">
+  <title>ANGLE — Le résultat ne dit pas tout.</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Aller au contenu</a>
+  <div class="pointer-light" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="#accueil" aria-label="ANGLE, accueil">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M4 27 16 5l12 22M10 20h12" stroke="currentColor" stroke-width="2.5"/></svg>
+      <span>ANGLE<span class="brand-dot">.</span></span>
+    </a>
+    <nav aria-label="Navigation principale">
+      <a href="#accueil" data-nav="home" aria-current="page">Accueil</a>
+      <a href="#historique" data-nav="history">Historique <span id="history-count" class="count">0</span></a>
+    </nav>
+    <button id="motion-toggle" class="motion-toggle" type="button" aria-pressed="false" hidden>Mouvements : actifs</button>
+  </header>
+  <div id="storage-warning" class="storage-warning" role="status" hidden></div>
+  <main id="main">
+    <div id="home" class="home">
+      <section id="accueil" class="scene hero" aria-labelledby="hero-title">
+        <div class="hero-background" aria-hidden="true">
+          <div class="terrain">
+            <svg viewBox="0 0 1440 1000" preserveAspectRatio="xMidYMid slice" fill="none">
+              <g class="terrain-lines" stroke="currentColor">
+                <path d="M-100 920 310 500 580 600 920 170 1500 450"/>
+                <path d="M-100 850 300 450 570 550 910 120 1500 400"/>
+                <path d="M-100 780 290 400 560 500 900 70 1500 350"/>
+                <path d="M-100 710 280 350 550 450 890 20 1500 300"/>
+                <path d="M-100 640 270 300 540 400 880-30 1500 250"/>
+                <path d="M-100 570 260 250 530 350 870-80 1500 200"/>
+                <path d="M-100 500 250 200 520 300 860-130 1500 150"/>
+                <path d="M-100 430 240 150 510 250 850-180 1500 100"/>
+                <path d="M-100 990 320 550 590 650 930 220 1500 500"/>
+                <path d="M-100 1060 330 600 600 700 940 270 1500 550"/>
+                <path d="M-100 1130 340 650 610 750 950 320 1500 600"/>
+              </g>
+              <path class="hero-vector" d="M180 850 670 630 920 170 1300 360"/>
+              <circle cx="920" cy="170" r="10" fill="currentColor"/>
+              <circle cx="920" cy="170" r="60" stroke="currentColor" stroke-dasharray="2 9"/>
+            </svg>
+          </div>
+          <!-- Vidéo facultative : renseigner VIDEO_SOURCES.hero dans script.js.
+               Aucun fichier vidéo fictif n'est demandé par défaut. -->
+          <video id="hero-video" class="cinema-video" muted playsinline loop preload="none" tabindex="-1" aria-hidden="true" disablepictureinpicture></video>
+          <div class="cinema-veil"></div><div class="grain"></div>
+          <div class="hero-sight"><span></span><i></i></div>
+        </div>
+        <div class="hero-topline mono"><span><i class="live-dot"></i> FORTNITE RANKED / DÉBRIEF</span><span>RÉSULTAT ≠ DÉCISION</span></div>
+        <div class="hero-copy">
+          <p class="eyebrow" data-reveal>PRENDS UNE SECONDE D’AVANCE SUR TON PROCHAIN CHOIX.</p>
+          <h1 id="hero-title" class="display" tabindex="-1" data-split>Le résultat<br>ne dit <em>pas tout.</em></h1>
+          <div class="hero-bottom" data-reveal>
+            <p class="hero-description">Tu connais l’issue.<br>Retrouve ce qui a précédé la décision.</p>
+            <div class="hero-actions">
+              <button id="start-button" class="button primary" type="button" disabled>Analyser un fight <span aria-hidden="true">↗</span></button>
+              <button id="resume-button" class="button secondary" type="button" hidden>Reprendre mon brouillon</button>
+            </div>
+          </div>
+        </div>
+        <div class="hero-baseline mono"><span>SANS COMPTE / SANS IA / DONNÉES LOCALES</span><a href="#doute" class="scroll-link">EXPLORER <span aria-hidden="true">↓</span></a></div>
+      </section>
+
+      <section id="doute" class="scene doubt" aria-labelledby="doubt-title">
+        <div class="section-index mono" data-reveal><span>01 / LE DOUTE</span><span>NE CONFONDS PAS LES DEUX.</span></div>
+        <h2 id="doubt-title" class="doubt-title" data-split>Tu peux gagner<br>un mauvais pari.<br><span class="dim">Et perdre après<br>un choix défendable.</span></h2>
+        <div class="doubt-note" data-reveal><span class="note-cross" aria-hidden="true">+</span><p>Un combat gagné n’est pas toujours une bonne décision. Un combat perdu n’est pas toujours une erreur.<br><br>La question n’est pas seulement « qu’est-ce qui s’est passé ? », mais « qu’est-ce que je savais avant d’agir ? »</p></div>
+        <div class="cut-line" aria-hidden="true"></div>
+      </section>
+
+      <section id="champ" class="scene decision-scene" aria-labelledby="field-title">
+        <div class="section-index mono" data-reveal><span>02 / LE CHAMP DE DÉCISION</span><span>UNE SITUATION. PLUSIEURS OPTIONS.</span></div>
+        <div class="field-intro"><h2 id="field-title" class="section-title" data-split>Avant le tir,<br>il y a <em>le choix.</em></h2><p data-reveal>Engager maintenant. Changer de chemin. Attendre une information.<br>Compare ce que tu pouvais réellement envisager.</p></div>
+        <div class="tactical-stage" data-reveal>
+          <div class="map-chrome mono"><span>ANGLE / CARTE ABSTRAITE</span><span>LE RÉSULTAT N’EST PAS SIMULÉ</span></div>
+          <div class="map-depth">
+            <svg id="decision-map" viewBox="0 0 1000 520" role="img" aria-labelledby="map-title map-desc">
+              <title id="map-title">Trois trajectoires à partir d’une même position</title>
+              <desc id="map-desc">Une carte abstraite illustre engager, changer de chemin ou observer. Les boutons sous la carte expliquent les questions associées, sans désigner de meilleure action.</desc>
+              <defs>
+                <pattern id="map-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0v40" fill="none" stroke="#29302e" stroke-width=".5"/></pattern>
+                <radialGradient id="map-glow"><stop stop-color="#c7ff6b" stop-opacity=".12"/><stop offset="1" stop-color="#c7ff6b" stop-opacity="0"/></radialGradient>
+              </defs>
+              <rect width="1000" height="520" fill="url(#map-grid)"/>
+              <circle cx="430" cy="300" r="250" fill="url(#map-glow)"/>
+              <g class="map-contours" fill="none" stroke="#56615a" stroke-width="1">
+                <path d="M0 170 210 110 350 175 490 80 650 110 800 35 1000 90"/>
+                <path d="M0 190 210 130 350 195 490 100 650 130 800 55 1000 110"/>
+                <path d="M0 210 210 150 350 215 490 120 650 150 800 75 1000 130"/>
+                <path d="M0 230 210 170 350 235 490 140 650 170 800 95 1000 150"/>
+                <path d="M0 250 210 190 350 255 490 160 650 190 800 115 1000 170"/>
+                <path d="M520 520 650 380 810 420 1000 300M550 520 670 400 820 440 1000 325M580 520 690 420 830 460 1000 350"/>
+              </g>
+              <g class="map-obstacles" fill="#171e1b" stroke="#6b786c"><path d="m435 210 60-25 35 60-65 22Z"/><path d="m650 265 70 18-12 60-70-16Z"/><path d="m230 335 45 12-18 70-45-12Z"/></g>
+              <g class="map-route is-active" data-map-route="engage"><path d="M155 390 345 300 550 275 770 170"/><circle class="route-end" cx="770" cy="170" r="7"/></g>
+              <g class="map-route" data-map-route="rotate"><path d="M155 390 345 445 570 420 835 350"/><circle class="route-end" cx="835" cy="350" r="7"/></g>
+              <g class="map-route" data-map-route="observe"><path d="M155 390 180 255 270 180"/><circle class="route-end" cx="270" cy="180" r="7"/></g>
+              <g class="map-origin"><circle cx="155" cy="390" r="9"/><circle class="origin-ring" cx="155" cy="390" r="22" fill="none"/></g>
+              <g class="map-labels"><text x="75" y="445">TON POINT DE DÉPART</text><text x="790" y="160">01</text><text x="850" y="345">02</text><text x="285" y="175">03</text></g>
+              <path class="map-reticle" d="M480 250h40m-20-20v40"/>
+            </svg>
+          </div>
+          <div class="route-controls" role="group" aria-label="Explorer les trajectoires illustratives">
+            <button class="route-button is-active" data-route="engage" aria-pressed="true" type="button" disabled><span>01</span> Engager <i aria-hidden="true">↗</i></button>
+            <button class="route-button" data-route="rotate" aria-pressed="false" type="button" disabled><span>02</span> Changer de chemin <i aria-hidden="true">→</i></button>
+            <button class="route-button" data-route="observe" aria-pressed="false" type="button" disabled><span>03</span> Observer <i aria-hidden="true">◎</i></button>
+          </div>
+          <p id="route-description" class="route-description" aria-live="polite">Engager : quel bénéfice attendais-tu, pour quel risque et pour quel objectif ?</p>
+        </div>
+      </section>
+
+      <section id="methode" class="scene method-scene" aria-labelledby="method-title">
+        <div class="section-index mono" data-reveal><span>03 / LA MÉTHODE</span><span>PAS DE VERDICT PRÉFABRIQUÉ.</span></div>
+        <div class="method-heading"><h2 id="method-title" class="section-title" data-split>Moins de réflexes.<br>Plus de <em>recul.</em></h2><p data-reveal>ANGLE ne joue pas à ta place.<br>Et ne pense pas à ta place.</p></div>
+        <ol class="method-list">
+          <li data-reveal><span class="method-number">01</span><div><h3>Raconte.</h3><p>Ta position. Ton intention. L’issue. Pose les faits tels que tu t’en souviens.</p></div><span class="method-symbol" aria-hidden="true">[ + ]</span></li>
+          <li data-reveal><span class="method-number">02</span><div><h3>Compare.</h3><p>Les informations disponibles et les autres options. Les risques d’agir, mais aussi ceux de ne pas agir.</p></div><span class="method-symbol" aria-hidden="true">↗ ↘</span></li>
+          <li data-reveal><span class="method-number">03</span><div><h3>Conclus.</h3><p>Une décision défendable, à revoir ou trop incertaine. Ta justification et ton prochain signal à vérifier.</p></div><span class="method-symbol" aria-hidden="true">[ ? ]</span></li>
+        </ol>
+      </section>
+
+      <section id="passage" class="scene passage" aria-labelledby="passage-title">
+        <div class="passage-background" aria-hidden="true"><div class="passage-aperture"></div>
+          <!-- Vidéo facultative : VIDEO_SOURCES.passage, aucune URL par défaut. -->
+          <video id="passage-video" class="cinema-video" muted playsinline loop preload="none" tabindex="-1" aria-hidden="true" disablepictureinpicture></video><div class="cinema-veil"></div>
+        </div>
+        <p class="eyebrow" data-reveal>04 / RETOUR AU POINT DE DÉPART</p>
+        <h2 id="passage-title" class="passage-title" data-split>Le prochain choix<br>commence <em>ici.</em></h2>
+        <p class="passage-copy" data-reveal>Pas une note. Pas une excuse.<br>Un raisonnement que tu peux examiner.</p>
+        <button class="button primary large" data-start type="button" disabled>Analyser un fight <span aria-hidden="true">↗</span></button>
+        <p class="passage-note mono">GRATUIT · SANS COMPTE · ANALYSE DE L’ENGAGEMENT EN V1</p>
+      </section>
+    </div>
+    <section id="workspace" class="workspace" aria-label="Espace d’analyse" hidden></section>
+    <noscript><div class="notice noscript-note">L’accueil reste consultable sans JavaScript. Active JavaScript pour utiliser le questionnaire, la carte interactive et l’historique local.</div></noscript>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-top"><span class="footer-wordmark" aria-hidden="true">ANGLE.</span><p>Le résultat est un fait.<br>La décision mérite une question.</p></div>
+    <p>Prototype gratuit et non commercial. V1 : analyse de la décision d’engager. Pas de coaching mécanique, de lecture de replay ou de verdict automatique.</p>
+    <p>Tes réponses ne sont pas envoyées par cette application. Le stockage local n’est ni un compte ni une sauvegarde garantie.</p>
+    <details><summary>Indépendance et propriété intellectuelle</summary><p>ANGLE n’est ni affilié à Epic Games ni approuvé par Epic Games. Les éléments graphiques de ce prototype sont originaux.</p><p lang="en">Portions of the materials used are trademarks and/or copyrighted works of Epic Games, Inc. All rights reserved by Epic. This material is not official and is not endorsed by Epic.</p></details>
+  </footer>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
