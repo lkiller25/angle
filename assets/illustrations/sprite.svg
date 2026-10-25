@@ -1,0 +1,454 @@
+<!--
+  DÉCLIC — système d'illustration « L'atelier des possibles »
+  Source unique des scènes SVG. Inlinée dans index.html par tools/build.mjs.
+
+  Grammaire partagée :
+  • trait : encre #20221F, 2.2 px, bouts et jonctions arrondis
+  • papier : #FFFDF7 (devant), #F1EADA (derrière), ombre portée dure décalée de 4-6 px (#DDD3BE)
+  • couleurs réservées aux illustrations : corail #F06445, bleu #7FA3C4, jaune #E8B54B, sauge #8FA98C
+  • même logique de perspective : vue de trois-quarts légère, objets posés sur une ligne de sol
+  • couleurs littérales (pas de var()) pour que les fichiers restent valides hors ligne et en <img>
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <style>
+      .trait { fill: none; stroke: #20221F; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <!-- ============ SCÈNE D'ACCUEIL : le carnet entouré de son petit monde ============ -->
+  <symbol id="ill-accueil" viewBox="0 0 520 480">
+    <g class="trait">
+      <!-- halo de papier -->
+      <circle cx="262" cy="248" r="206" fill="#F1EADA" opacity=".45" stroke="none"/>
+      <circle cx="262" cy="248" r="206" stroke-dasharray="2 11" opacity=".28"/>
+
+      <!-- la table de l'atelier -->
+      <path d="M18 428c80-14 142 4 208 0s78-12 112-2 78 4 176-6"/>
+      <path d="M54 446c68-10 124 2 176-2s88-8 132-2" stroke-width="1.4" opacity=".28"/>
+
+      <!-- fenêtre : plusieurs façons d'observer la même scène -->
+      <g transform="rotate(-3 95 118)">
+        <rect x="33" y="66" width="108" height="96" rx="4" fill="#DDD3BE" stroke="none"/>
+        <rect x="28" y="60" width="108" height="96" rx="4" fill="#FFFDF7"/>
+        <rect x="35" y="67" width="43" height="35" fill="#7FA3C4" fill-opacity=".55" stroke="none"/>
+        <rect x="86" y="67" width="43" height="35" fill="#F1EADA" stroke="none"/>
+        <rect x="35" y="110" width="94" height="39" fill="#8FA98C" fill-opacity=".3" stroke="none"/>
+        <circle cx="104" cy="88" r="6" fill="#F06445" stroke="none"/>
+        <path d="M82 60v96M28 106h108"/>
+        <path d="M20 156h124"/>
+        <path d="M160 96c6 8 6 16 0 24" stroke-width="1.5" opacity=".5"/>
+      </g>
+
+      <!-- tasse dont la vapeur devient des formes -->
+      <g transform="translate(-8 8)">
+        <path d="M80 214c-7-16 8-20 4-34" stroke-dasharray="5 6" opacity=".75"/>
+        <circle cx="86" cy="168" r="8" fill="#7FA3C4" fill-opacity=".85" stroke="none"/>
+        <rect x="110" y="156" width="15" height="15" rx="2" fill="#E8B54B" fill-opacity=".9" stroke="none" transform="rotate(14 117 163)"/>
+        <path d="M148 160l9 16h-18z" fill="#8FA98C" stroke="none"/>
+        <path d="M62 232h52v44c0 13-9 20-26 20s-26-7-26-20z" fill="#FFFDF7"/>
+        <path d="M114 243c13-2 19 6 17 15-2 8-9 12-17 11"/>
+        <path d="M62 246h52" stroke-width="1.5" opacity=".7"/>
+        <path d="M56 300h64" stroke-width="1.5" opacity=".5"/>
+      </g>
+
+      <!-- crayon dont le trait devient un chemin -->
+      <g transform="rotate(-19 60 372)">
+        <rect x="41" y="362" width="94" height="25" rx="3" fill="#DDD3BE" stroke="none"/>
+        <rect x="38" y="358" width="94" height="25" rx="3" fill="#FFFDF7"/>
+        <path d="M132 358l25 12.5L132 383z" fill="#E8B54B"/>
+        <path d="M150 368l6.5 2.5-6.5 2.5z" fill="#20221F" stroke="none"/>
+        <path d="M59 358v25M113 358v25" stroke-width="1.4" opacity=".7"/>
+        <path d="M38 363h7v13h-7z" fill="#F06445" stroke="none"/>
+      </g>
+      <path d="M158 352c26-10 44-22 54-38" stroke-dasharray="1 9" stroke-width="3" opacity=".8"/>
+      <path d="M206 306l-2 8 8-2" stroke-width="2" opacity=".8"/>
+
+      <!-- feuille qui se déplie en petit paysage -->
+      <g transform="rotate(3 380 120)">
+        <path d="M322 168l30-24 30 24 30-24 30 24" fill="#DDD3BE" stroke="none" transform="translate(5 8)"/>
+        <path d="M322 168l30-24 30 24 30-24 30 24v34l-30 6-30-6-30 6-30-6z" fill="#FFFDF7"/>
+        <path d="M322 168l30-24 30 24 30-24 30 24" />
+        <g>
+          <path d="M336 196l16-20 14 17 12-15 16 20z" fill="#8FA98C" fill-opacity=".65" stroke="none"/>
+          <path d="M390 200l12-15 14 18z" fill="#8FA98C" fill-opacity=".4" stroke="none"/>
+          <circle cx="424" cy="166" r="7" fill="#E8B54B" stroke="none"/>
+          <circle cx="424" cy="166" r="11" stroke-width="1.3" opacity=".35"/>
+          <path d="M382 156c6-4 12-4 16 0M382 156l-2-4M398 156l2-4" stroke-width="1.5"/>
+        </g>
+        <g stroke-width="1.2" opacity=".35">
+          <path d="M352 174v22M382 150v46M412 174v22"/>
+        </g>
+        <path d="M322 202l30 6 30-6 30 6 30-6" opacity=".55"/>
+        <path d="M344 61c18-2 34 4 44 16" stroke-dasharray="5 6" stroke-width="1.4" opacity=".5"/>
+      </g>
+
+      <!-- oiseau de papier, plié dans le coin -->
+      <g>
+        <path d="M232 78c11-13 31-15 42-4-9 15-31 19-42 4z" fill="#7FA3C4"/>
+        <path d="M252 70c7-11 16-16 22-14-2 11-9 18-16 21z" fill="#8FA98C"/>
+        <path d="M274 74l11 2-11 5z" fill="#F06445" stroke="none"/>
+        <circle cx="261" cy="72" r="2" fill="#20221F" stroke="none"/>
+        <path d="M226 62h-14M232 54l-7-10" stroke-width="1.4" opacity=".6"/>
+      </g>
+
+      <!-- partager : deux points de vue qui se répondent -->
+      <g transform="translate(0 4)">
+        <path d="M404 250h30a9 9 0 0 1 9 9v11a9 9 0 0 1-9 9h-17l-11 9v-9a9 9 0 0 1-2-6v-14a9 9 0 0 1 9-9z" fill="#FFFDF7"/>
+        <path d="M443 259h28a9 9 0 0 1 9 9v13a9 9 0 0 1-9 9h-4v9l-11-9h-13a9 9 0 0 1-9-9v-13a9 9 0 0 1 9-9z" fill="#7FA3C4" fill-opacity=".5"/>
+        <circle cx="417" cy="274" r="4" fill="#F06445" stroke="none"/>
+      </g>
+
+      <!-- carnet DÉCLIC : objet central -->
+      <g>
+        <!-- ombre portée sur la table -->
+        <path d="M146 304l140 20 130-20 4 108-134 24-146-24z" fill="#DDD3BE" stroke="none" opacity=".85"/>
+        <!-- couverture corail sous les pages -->
+        <path d="M134 288l152 22 130-22 4 116-134 24-152-24z" fill="#F06445" fill-opacity=".75" stroke="none"/>
+        <path d="M140 294l146 20 130-20v104l-130 22-146-22z" fill="#FFFDF7"/>
+        <path d="M140 294l146 20v104l-146-20z" fill="#F1EADA"/>
+        <!-- contours -->
+        <path d="M140 294l146 20 130-20v104l-130 22-146-22z"/>
+        <path d="M286 314v104"/>
+        <path d="M140 398l146 20 130-20" stroke-width="1.5" opacity=".35"/>
+        <!-- écriture (page de droite) -->
+        <path d="M306 340l84-16M306 360l84-16M306 380l58-11" stroke-width="1.5" opacity=".45"/>
+        <!-- signet corail -->
+        <path d="M356 322l22-4v44l-11 6-11-8z" fill="#F06445"/>
+        <!-- petit dessin (page de gauche) -->
+        <path d="M170 334c14-12 34-8 34 6 0 12-18 16-24 6-4-7 4-14 12-10"/>
+        <circle cx="176" cy="374" r="3" fill="#E8B54B" stroke="none"/>
+        <path d="M168 368h34" stroke-width="1.4" opacity=".4"/>
+        <!-- le trait continue depuis le carnet -->
+        <path d="M414 336c16 8 22 20 16 32" stroke-dasharray="5 6" opacity=".55"/>
+      </g>
+
+      <!-- petits motifs flottants -->
+      <path d="M170 176l13 6-8 11z" fill="#E8B54B" stroke-width="1.5"/>
+      <circle cx="330" cy="212" r="4" fill="#8FA98C" stroke="none"/>
+      <circle cx="372" cy="186" r="2.8" fill="#8FA98C" stroke="none"/>
+      <circle cx="196" cy="252" r="3.2" fill="#F06445" stroke="none"/>
+      <circle cx="486" cy="200" r="3" fill="#7FA3C4" stroke="none"/>
+      <circle cx="22" cy="222" r="3.2" fill="#7FA3C4" stroke="none"/>
+      <g stroke-width="1.3" opacity=".35">
+        <path d="M412 424l-12 14M470 400l6 18M226 212l10 8M250 202l8 6"/>
+      </g>
+    </g>
+  </symbol>
+
+  <!-- ============ CATÉGORIE : CRÉER ============ -->
+  <symbol id="ill-creer" viewBox="0 0 240 200">
+    <g class="trait">
+      <path d="M34 52c16-14 38-12 48 2" stroke-dasharray="5 6" opacity=".5"/>
+      <circle cx="66" cy="66" r="3.4" fill="#E8B54B" stroke="none"/>
+      <rect x="30" y="98" width="14" height="14" rx="2" fill="#7FA3C4" fill-opacity=".6" stroke="none" transform="rotate(14 37 105)"/>
+      <g transform="rotate(-20 30 146)">
+        <rect x="21" y="136" width="98" height="26" rx="3" fill="#DDD3BE" stroke="none"/>
+        <rect x="18" y="132" width="98" height="26" rx="3" fill="#FFFDF7"/>
+        <path d="M116 132l26 13-26 13z" fill="#E8B54B"/>
+        <path d="M135 142l7 3-7 3z" fill="#20221F" stroke="none"/>
+        <path d="M40 132v26M96 132v26" stroke-width="1.5"/>
+        <path d="M18 138h7v14h-7z" fill="#F06445" stroke="none"/>
+      </g>
+      <path d="M158 96c16-8 30 2 26 15-3 11-18 13-24 5-5-7 0-16 9-15 10 1 14 12 8 21-6 10-22 12-32 4"/>
+      <path d="M152 120c8 10 16 16 26 20" stroke-dasharray="5 6" opacity=".55"/>
+      <g>
+        <path d="M168 56c12-14 34-16 46-4-10 16-34 20-46 4z" fill="#7FA3C4"/>
+        <path d="M190 48c8-12 18-18 24-16-2 12-10 20-18 24z" fill="#8FA98C"/>
+        <path d="M214 52l12 2-12 6z" fill="#F06445" stroke="none"/>
+        <circle cx="200" cy="50" r="2.2" fill="#20221F" stroke="none"/>
+      </g>
+      <path d="M160 42h-12M166 34l-6-9" stroke-width="1.5"/>
+      <path d="M34 176c50-8 96 4 172-2" opacity=".45"/>
+      <circle cx="214" cy="160" r="3.4" fill="#8FA98C" stroke="none"/>
+    </g>
+  </symbol>
+
+  <!-- ============ CATÉGORIE : OBSERVER ============ -->
+  <symbol id="ill-observer" viewBox="0 0 240 200">
+    <g class="trait">
+      <!-- le cadre : ce qu'on regarde -->
+      <path d="M43 46h124a6 6 0 0 1 6 6v96a6 6 0 0 1-6 6H43a6 6 0 0 1-6-6V52a6 6 0 0 1 6-6z" fill="#DDD3BE" stroke="none"/>
+      <path d="M38 40h124a6 6 0 0 1 6 6v96a6 6 0 0 1-6 6H38a6 6 0 0 1-6-6V46a6 6 0 0 1 6-6z" fill="#FFFDF7"/>
+      <path d="M38 40h124a6 6 0 0 1 6 6v34H32V46a6 6 0 0 1 6-6z" fill="#7FA3C4" fill-opacity=".16" stroke="none"/>
+      <g>
+        <path d="M58 124c0-28 17-50 43-56-2 28-17 50-43 56z" fill="#8FA98C" fill-opacity=".7"/>
+        <path d="M58 124c0-28 17-50 43-56-2 28-17 50-43 56zM101 68c-15 17-28 35-36 50"/>
+        <g stroke-width="1.3" opacity=".55">
+          <path d="M80 96l13-3M75 105l11-3M70 114l11-3M92 82l11-5M86 89l11-4"/>
+        </g>
+        <circle cx="120" cy="110" r="5" fill="#F06445" stroke="none"/>
+      </g>
+      <path d="M32 76v-24a6 6 0 0 1 6-6h24M168 76v70a6 6 0 0 1-6 6h-24" />
+      <!-- la loupe : ce qu'on remarque -->
+      <g>
+        <circle cx="182" cy="128" r="27" fill="#FFFDF7"/>
+        <circle cx="182" cy="128" r="27"/>
+        <path d="M201 148l20 20" stroke-width="6"/>
+        <path d="M201 148l20 20" stroke-width="2.2" stroke="#FFFDF7"/>
+        <circle cx="182" cy="128" r="7" fill="#F06445" fill-opacity=".85" stroke="none"/>
+        <path d="M168 138c4 6 10 10 18 11" stroke-width="1.3" opacity=".4"/>
+      </g>
+      <path d="M160 106c8-10 22-16 36-14" stroke-dasharray="4 5" opacity=".4" stroke-width="1.4"/>
+      <circle cx="28" cy="168" r="2.4" fill="#E8B54B" stroke="none"/>
+      <circle cx="222" cy="62" r="2.8" fill="#8FA98C" stroke="none"/>
+      <circle cx="26" cy="98" r="1.8" fill="#20221F" opacity=".3" stroke="none"/>
+    </g>
+  </symbol>
+
+  <!-- ============ CATÉGORIE : RÉFLÉCHIR ============ -->
+  <symbol id="ill-reflechir" viewBox="0 0 240 200">
+    <g class="trait">
+      <!-- arrangement 1 : les formes assemblées -->
+      <g>
+        <path d="M48 60h54v54H48z" fill="#7FA3C4" fill-opacity=".55"/>
+        <path d="M75 30l30 30H45z" fill="#E8B54B" fill-opacity=".8"/>
+        <path d="M75 114c15 0 26 12 26 27H49c0-15 11-27 26-27z" fill="#8FA98C" fill-opacity=".65"/>
+        <circle cx="75" cy="88" r="4" fill="#F06445" stroke="none"/>
+      </g>
+      <!-- le lien : on peut réarranger -->
+      <path d="M118 88c14-8 30-8 44 0" stroke-dasharray="1 7" stroke-width="3" opacity=".65"/>
+      <path d="M156 82l7 6-7 7" opacity=".65" stroke-width="2"/>
+      <!-- arrangement 2 : les mêmes formes, autrement -->
+      <g opacity=".4" stroke-dasharray="4 5">
+        <path d="M198 44l34 34h-34z"/>
+        <rect x="168" y="86" width="48" height="32" rx="2"/>
+        <circle cx="196" cy="148" r="22"/>
+        <path d="M196 126v-8M196 170v6"/>
+      </g>
+      <g stroke-width="1.3" opacity=".3">
+        <path d="M30 152l10 8M206 28l10 8M42 28l-4 10"/>
+      </g>
+      <circle cx="26" cy="104" r="3.2" fill="#F06445" stroke="none"/>
+      <circle cx="226" cy="104" r="2.6" fill="#F06445" stroke="none" opacity=".7"/>
+    </g>
+  </symbol>
+
+  <!-- ============ CATÉGORIE : BOUGER DOUCEMENT ============ -->
+  <symbol id="ill-bouger" viewBox="0 0 240 200">
+    <g class="trait">
+      <circle cx="202" cy="44" r="9" fill="#F06445" fill-opacity=".9"/>
+      <g stroke-width="1.4">
+        <path d="M202 24v-6M202 70v-6M182 44h-6M228 44h-6M188 30l-4-4M216 30l4-4M188 58l-4 4M216 58l4 4"/>
+      </g>
+      <!-- arbre -->
+      <g>
+        <path d="M60 50c22-6 40 10 38 30-2 18-18 28-38 24-18-4-28-18-24-32 4-14 12-20 24-22z" fill="#8FA98C" fill-opacity=".4"/>
+        <path d="M60 50c22-6 40 10 38 30-2 18-18 28-38 24-18-4-28-18-24-32 4-14 12-20 24-22z"/>
+        <path d="M60 104v32M60 136c-9 0-15 3-19 6M60 136c9 0 15 3 19 6"/>
+        <path d="M58 72c-8 6-12 16-10 26" stroke-width="1.3" opacity=".45"/>
+      </g>
+      <!-- banc public, de profil -->
+      <g>
+        <path d="M148 96h68v9a3 3 0 0 1-3 3h-62a3 3 0 0 1-3-3z" fill="#FFFDF7"/>
+        <path d="M164 108h52v9a3 3 0 0 1-3 3h-46a3 3 0 0 1-3-3z" fill="#FFFDF7"/>
+        <path d="M148 96h68M164 108h52"/>
+        <path d="M168 108v-12M212 108v-12" stroke-width="1.8"/>
+        <path d="M168 120v30M206 120v30"/>
+        <path d="M164 120h46"/>
+        <path d="M152 150h-4M210 150h4" stroke-width="1.4" opacity=".6"/>
+      </g>
+      <!-- trajet -->
+      <path d="M38 168c24-16 34 4 54-12s28 4 42-14" stroke-dasharray="1 8" stroke-width="3"/>
+      <g fill="#8FA98C" stroke="none">
+        <path d="M60 156c4-2 8 0 8 4s-4 6-7 4z" fill-opacity=".8"/>
+        <path d="M96 148c4-2 8 0 8 4s-4 6-7 4z" fill-opacity=".55"/>
+        <path d="M132 140c4-2 8 0 8 4s-4 6-7 4z" fill-opacity=".35"/>
+      </g>
+      <path d="M18 184c50-10 106 4 202-8" opacity=".45"/>
+      <circle cx="118" cy="34" r="2.8" fill="#E8B54B" stroke="none"/>
+      <path d="M104 52c10-6 20-8 30-6" stroke-dasharray="5 6" opacity=".4"/>
+    </g>
+  </symbol>
+
+  <!-- ============ CATÉGORIE : PARTAGER ============ -->
+  <symbol id="ill-partager" viewBox="0 0 240 200">
+    <g class="trait">
+      <path d="M51 58h86a8 8 0 0 1 8 8v50a8 8 0 0 1-8 8H83l-18 16v-16a8 8 0 0 1-14-8V66a8 8 0 0 1 8-8z" fill="#DDD3BE" stroke="none"/>
+      <path d="M46 52h86a8 8 0 0 1 8 8v50a8 8 0 0 1-8 8H78l-18 16v-16a8 8 0 0 1-8-8V60a8 8 0 0 1 8-8z" fill="#7FA3C4" fill-opacity=".45"/>
+      <path d="M64 76h52M64 92h34M64 108h22"/>
+      <path d="M127 102h72a8 8 0 0 1 8 8v40a8 8 0 0 1-8 8h-40l-14 12v-12a8 8 0 0 1-6-8v-40a8 8 0 0 1 8-8z" fill="#DDD3BE" stroke="none"/>
+      <path d="M122 96h72a8 8 0 0 1 8 8v40a8 8 0 0 1-8 8h-40l-14 12v-12a8 8 0 0 1-6-8v-40a8 8 0 0 1 8-8z" fill="#E8B54B" fill-opacity=".5"/>
+      <circle cx="150" cy="124" r="3.4" fill="#20221F" stroke="none"/>
+      <circle cx="168" cy="124" r="3.4" fill="#20221F" stroke="none"/>
+      <circle cx="186" cy="124" r="3.4" fill="#20221F" stroke="none"/>
+      <path d="M150 142h36" stroke-width="1.5"/>
+      <path d="M76 176c-14 6-30 2-38-10" opacity=".5"/>
+      <path d="M26 158l4-8 8 4"/>
+      <path d="M186 38c10-6 22-4 28 4" opacity=".5"/>
+      <path d="M208 34l-6 2 2 8"/>
+      <circle cx="46" cy="34" r="4" fill="#F06445" stroke="none"/>
+      <circle cx="216" cy="82" r="3" fill="#8FA98C" stroke="none"/>
+    </g>
+  </symbol>
+
+  <!-- ============ ÉTAT : CARNET VIDE ============ -->
+  <symbol id="ill-carnet-vide" viewBox="0 0 240 200">
+    <g class="trait">
+      <path d="M84 41h96a6 6 0 0 1 6 6v132a6 6 0 0 1-6 6H84a6 6 0 0 1-6-6V47a6 6 0 0 1 6-6z" fill="#DDD3BE" stroke="none"/>
+      <path d="M78 34h96a6 6 0 0 1 6 6v132a6 6 0 0 1-6 6H78a6 6 0 0 1-6-6V40a6 6 0 0 1 6-6z" fill="#FFFDF7"/>
+      <path d="M90 34v144M96 34v144" stroke-width="1.4" opacity=".3"/>
+      <path d="M132 34h24v54l-12-10-12 10z" fill="#F06445"/>
+      <path d="M110 104h50M110 120h34M110 136h44" stroke-width="1.4" opacity=".3"/>
+      <path d="M110 152h40" stroke-dasharray="5 6" opacity=".55"/>
+      <g transform="rotate(-14 160 148)">
+        <rect x="142" y="140" width="60" height="14" rx="3" fill="#FFFDF7"/>
+        <path d="M202 140l14 7-14 7z" fill="#E8B54B"/>
+        <path d="M214 145l5 2-5 2z" fill="#20221F" stroke="none"/>
+      </g>
+      <circle cx="52" cy="70" r="3.4" fill="#7FA3C4" stroke="none"/>
+      <circle cx="44" cy="128" r="2.6" fill="#8FA98C" stroke="none"/>
+      <path d="M36 170h168" stroke-width="1.2" opacity=".25"/>
+    </g>
+  </symbol>
+
+  <!-- ============ ÉTAT : FAVORIS VIDES ============ -->
+  <symbol id="ill-favoris-vide" viewBox="0 0 240 200">
+    <g class="trait">
+      <!-- marque-page prêt à être posé -->
+      <path d="M126 26v22" stroke-dasharray="5 6" opacity=".4"/>
+      <path d="M104 58h44v62l-22-16-22 16z" fill="#DDD3BE" stroke="none"/>
+      <path d="M100 52h44v62l-22-16-22 16z" fill="#FFFDF7"/>
+      <path d="M106 62h32v18h-32z" fill="#F06445" fill-opacity=".3" stroke="none"/>
+      <path d="M110 68h24M110 76h14" stroke-width="1.4" opacity=".5"/>
+      <!-- carnet fermé, vue de dessus -->
+      <g>
+        <path d="M36 130h164a6 6 0 0 1 6 6v40a6 6 0 0 1-6 6H36a6 6 0 0 1-6-6v-40a6 6 0 0 1 6-6z" fill="#DDD3BE" stroke="none" transform="translate(0 6)"/>
+        <path d="M36 130h164a6 6 0 0 1 6 6v40a6 6 0 0 1-6 6H36a6 6 0 0 1-6-6v-40a6 6 0 0 1 6-6z" fill="#F1EADA"/>
+        <path d="M30 130h164a6 6 0 0 1 6 6v40a6 6 0 0 1-6 6H30a6 6 0 0 1-6-6v-40a6 6 0 0 1 6-6z" fill="#FFFDF7"/>
+        <path d="M30 130h14v52H30a6 6 0 0 1-6-6v-40a6 6 0 0 1 6-6z" fill="#7FA3C4" fill-opacity=".35"/>
+        <path d="M30 130h164a6 6 0 0 1 6 6v40a6 6 0 0 1-6 6H30a6 6 0 0 1-6-6v-40a6 6 0 0 1 6-6z"/>
+        <path d="M44 130v52"/>
+        <path d="M150 130v52" stroke-dasharray="4 5" opacity=".5"/>
+        <path d="M62 146h72M62 158h44" stroke-width="1.3" opacity=".3"/>
+      </g>
+      <circle cx="44" cy="46" r="3" fill="#E8B54B" stroke="none"/>
+      <circle cx="198" cy="92" r="3.4" fill="#8FA98C" stroke="none"/>
+      <path d="M186 172l10 8" stroke-width="1.3" opacity=".3"/>
+    </g>
+  </symbol>
+
+  <!-- ============ ÉTAT : AUCUN RÉSULTAT ============ -->
+  <symbol id="ill-aucun-resultat" viewBox="0 0 240 200">
+    <g class="trait">
+      <g opacity=".35" stroke-dasharray="4 5">
+        <path d="M60 62l30-8 8 26-30 8z"/>
+        <path d="M150 40l34 14-12 28-30-16z"/>
+        <circle cx="84" cy="140" r="20"/>
+        <path d="M170 120h40"/>
+      </g>
+      <path d="M52 60l28-8 10 24-30 10z" fill="#E8B54B" fill-opacity=".9" transform="rotate(-8 62 66)"/>
+      <path d="M142 42h34v26h-34z" fill="#7FA3C4" fill-opacity=".85" transform="rotate(10 160 54)"/>
+      <circle cx="92" cy="138" r="21" fill="#FFFDF7"/>
+      <path d="M84 138h16M92 130v16" opacity=".45"/>
+      <g transform="rotate(-5 176 122)">
+        <path d="M154 112h44v20h-44z" fill="#8FA98C" fill-opacity=".85"/>
+        <path d="M160 118h28M160 126h18" stroke-width="1.3" opacity=".55"/>
+      </g>
+      <path d="M116 82c14-10 32-12 46-4" opacity=".55"/>
+      <path d="M158 74l6 4-8 4"/>
+      <path d="M54 156c-12 6-22 2-26-6" opacity=".5"/>
+      <path d="M30 142l-2 8 8 2"/>
+      <circle cx="204" cy="166" r="3" fill="#F06445" stroke="none"/>
+    </g>
+  </symbol>
+
+  <!-- ============ TAMPON : expérience enregistrée ============ -->
+  <symbol id="ill-tampon" viewBox="0 0 96 64">
+    <g transform="rotate(-6 48 32)" fill="none" stroke="#AB3B22" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="6" width="88" height="52" rx="7" stroke-width="2.6"/>
+      <rect x="10" y="12" width="76" height="40" rx="4" stroke-width="1.3" stroke-dasharray="3.5 3.5"/>
+      <path d="M48 20l3.9 7.9 8.6 1.3-6.2 6.1 1.4 8.6-7.7-4.1-7.7 4.1 1.4-8.6-6.2-6.1 8.6-1.3z" fill="#F06445" stroke="none" opacity=".92"/>
+    </g>
+  </symbol>
+
+  <!-- ============ PICTOGRAMMES DE CATÉGORIE (24×24, currentColor) ============ -->
+  <symbol id="g-creer" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 19.5 5.5 15l9-9 3.5 3.5-9 9z"/>
+      <path d="M5.5 15 4 19.5 8.5 18"/>
+      <path d="M15 5.5 17 3.5a2 2 0 0 1 3 0l.5.5a2 2 0 0 1 0 3L18.5 9"/>
+    </g>
+    <circle cx="19.5" cy="19.5" r="2" fill="#F06445"/>
+  </symbol>
+  <symbol id="g-observer" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/>
+      <circle cx="12" cy="12" r="3.4"/>
+    </g>
+    <circle cx="12" cy="12" r="1.2" fill="#F06445"/>
+  </symbol>
+  <symbol id="g-reflechir" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round">
+      <path d="M3.5 12.5 8 4l4.5 8.5z"/>
+      <rect x="12" y="13" width="8.5" height="7" rx="1"/>
+      <circle cx="8" cy="17" r="3"/>
+    </g>
+    <circle cx="8" cy="17" r="1.1" fill="#F06445"/>
+  </symbol>
+  <symbol id="g-bouger" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <path d="M3.5 18c3.5-1 5.5-6 9-6s5.5 4.5 8 3" stroke-dasharray="1 4.5"/>
+      <circle cx="19.5" cy="7" r="2.6"/>
+      <path d="M19.5 3.6V2M23 7h1.4M16 7h-1.4"/>
+    </g>
+    <circle cx="7" cy="12" r="1.6" fill="#F06445"/>
+  </symbol>
+  <symbol id="g-partager" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7">
+      <circle cx="9" cy="10" r="5"/>
+      <circle cx="15" cy="14" r="5"/>
+    </g>
+    <circle cx="12" cy="12" r="1.8" fill="#F06445"/>
+  </symbol>
+
+  <symbol id="g-maison" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 11 12 4l8 7"/>
+      <path d="M6 9.5V20h12V9.5"/>
+      <path d="M10 20v-5h4v5"/>
+    </g>
+    <circle cx="16.5" cy="7.5" r="1.6" fill="#F06445"/>
+  </symbol>
+  <symbol id="g-bureau" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9h18v2H3z"/>
+      <path d="M5 11v8M19 11v8"/>
+      <path d="M9 5h6v4H9z"/>
+      <path d="M11 3.5h2"/>
+    </g>
+    <circle cx="18.5" cy="19" r="1.6" fill="#F06445"/>
+  </symbol>
+  <symbol id="g-dehors" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 12V6"/>
+      <path d="M12 9c-3 0-5-2-5-5 3 0 5 2 5 5z"/>
+      <path d="M12 7c3 0 5-2 5-5-3 0-5 2-5 5z"/>
+      <path d="M12 12v4"/>
+      <path d="M5 20c2-2 5-2 7 0 2-2 5-2 7 0"/>
+    </g>
+    <circle cx="12" cy="19" r="1.5" fill="#F06445"/>
+  </symbol>
+  <symbol id="g-trajet" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 18c0-6 4-9 8-9s6 2 6 5"/>
+      <path d="M15 11l3 3 1-4"/>
+      <circle cx="6" cy="18" r="2"/>
+      <circle cx="18" cy="18" r="2"/>
+    </g>
+    <circle cx="12" cy="5" r="1.6" fill="#F06445"/>
+  </symbol>
+  <symbol id="g-ensemble" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.7">
+      <circle cx="9" cy="9" r="3.4"/>
+      <circle cx="16.5" cy="13" r="3.4"/>
+    </g>
+    <circle cx="12.7" cy="11" r="1.4" fill="#F06445"/>
+  </symbol>
+
+  <!-- ============ MARQUE ============ -->
+  <symbol id="marque" viewBox="0 0 28 28">
+    <path d="M3 21.5 9.5 13l4 4.2L21 6.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="23.5" cy="9.5" r="3" fill="#F06445"/>
+  </symbol>
+</svg>

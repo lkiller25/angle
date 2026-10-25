@@ -1,736 +1,1690 @@
-/* ANGLE — moteur d'analyse préservé + couche cinématique indépendante. */
-"use strict";
-(() => {
-  const $ = (selector) => document.querySelector(selector);
-  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
-  const home = $("#home");
-  const workspace = $("#workspace");
-  const warning = $("#storage-warning");
-  // Conserver ces clés et les identifiants des questions : compatibilité V1.
-  const KEYS = { history: "angle.v1.history", draft: "angle.v1.draft" };
-  const UNKNOWN = "Je ne sais plus.";
-  const OUTCOMES = { won: "Fight gagné", lost: "Fight perdu", other: "Autre issue / échange interrompu" };
-  const MODES = { zero: "Sans construction", build: "Avec construction" };
-  const TEAMS = { solo: "Solo", duo: "Duo", trio: "Trio", squad: "Section" };
-  const STAGES = ["Revenir au choix", "Préciser les informations", "Comparer les options", "Tirer ta conclusion"];
+/* ==========================================================================
+   DÉCLIC — logique du produit
+   --------------------------------------------------------------------------
+   JavaScript vanilla, aucun module ES (donc aucune restriction d'origine) :
+   le site fonctionne aussi bien sur GitHub Pages qu'ouvert directement en
+   local. Tout le contenu éditorial vit dans data/defis.js.
 
-  // Aucun sens de question ni condition d'analyse n'a été remplacé par un effet visuel.
-  const QUESTIONS = [
-    { id: "goal", stage: 0, type: "choice",
-      label: "Quel était ton objectif prioritaire sur cette partie ?",
-      help: "L’objectif réel au moment du choix, pas celui que tu aimerais avoir eu.",
-      options: [["top1", "Maximiser mes chances de Top 1"], ["points", "Chercher une élimination pour ma progression en ranked"], ["both", "Les deux, sans priorité clairement définie"], ["other", "Un autre objectif"], ["unknown", "Je ne sais plus"]] },
-    { id: "motive", stage: 0, type: "choice",
-      label: "Quelle était ta principale raison d’engager ?",
-      help: "Choisis la raison principale. Tu pourras nuancer ensuite.",
-      options: [["position", "Obtenir ou sécuriser une position"], ["resources", "Récupérer des ressources ou de l’équipement"], ["threat", "Écarter une menace"], ["elimination", "Rechercher une élimination"], ["reaction", "Réagir à une opportunité ou à une impulsion"], ["other", "Autre raison / je ne sais plus"]] },
-    { id: "nearby", stage: 0, type: "choice",
-      label: "Avant d’engager, qu’avais-tu observé sur les autres joueurs autour ?",
-      help: "L’absence d’indice après vérification n’est pas la même chose qu’une absence de vérification.",
-      options: [["signs", "J’avais des indices de présence"], ["checked", "J’avais vérifié, sans repérer d’indice"], ["unchecked", "Je n’avais pas vérifié"], ["unknown", "Je ne sais plus"]] },
-    { id: "zone", stage: 0, type: "choice",
-      label: "Quelle contrainte de zone connaissais-tu à cet instant ?",
-      options: [["comfortable", "J’avais du temps et une position jouable"], ["urgent", "Je devais bientôt me déplacer"], ["moving", "J’étais déjà en déplacement"], ["unknown", "Je ne sais plus"]] },
-    { id: "priority", stage: 1, type: "text",
-      label: "Si tes deux objectifs entraient en conflit, lequel voulais-tu privilégier ?",
-      when: (a) => a.goal === "both", help: "Tu peux aussi reconnaître que tu n’avais pas fait ce choix." },
-    { id: "otherGoal", stage: 1, type: "text", label: "Quel autre objectif poursuivais-tu ?", when: (a) => a.goal === "other" },
-    { id: "benefit", stage: 1, type: "text",
-      label: "Qu’espérais-tu obtenir concrètement grâce à cet engagement ?",
-      help: "Décris le bénéfice attendu avant de connaître le résultat." },
-    { id: "alternative", stage: 1, type: "choice",
-      label: "Voyais-tu une autre façon de poursuivre ton objectif sans engager maintenant ?",
-      help: "Une alternative disponible n’est pas automatiquement une meilleure alternative.",
-      options: [["yes", "Oui, j’avais une autre option"], ["no", "Je n’en voyais pas à cet instant"], ["unknown", "Je ne sais plus"]] },
-    { id: "evidence", stage: 1, type: "text",
-      label: "Quels indices de présence connaissais-tu avant d’agir ?",
-      when: (a) => a.nearby === "signs", help: "Ne rajoute pas une information découverte seulement après le combat." },
-    { id: "uncertainty", stage: 1, type: "text",
-      label: "Qu’est-ce qui restait incertain sur les autres joueurs autour de toi ?",
-      when: (a) => a.nearby !== "signs", help: "Ne pas avoir repéré quelqu’un ne prouve pas son absence." },
-    { id: "compare", stage: 2, type: "text",
-      label: "Compare ton engagement à l’autre option : bénéfices, risques et coûts des deux côtés.",
-      when: (a) => a.alternative === "yes", help: "Évite de comparer une version idéale de l’alternative à la pire issue du combat." },
-    { id: "notFight", stage: 2, type: "text",
-      label: "Qu’aurais-tu risqué ou abandonné en n’engageant pas à cet instant ?",
-      when: (a) => a.alternative !== "yes", help: "Ne pas combattre peut aussi avoir un coût. Tu peux manquer d’informations." },
-    { id: "positionGain", stage: 2, type: "text",
-      label: "Qu’est-ce que la position recherchée ajoutait à ta position actuelle ?",
-      when: (a) => a.motive === "position", help: "Distingue ce que tu espérais obtenir de ce que tu as effectivement obtenu." },
-    { id: "zoneTrade", stage: 2, type: "text",
-      label: "Comment l’engagement s’articulait-il avec ton déplacement vers la zone ?",
-      when: (a) => a.zone === "urgent" || a.zone === "moving", help: "Il pouvait aider le déplacement, le retarder, ou avoir un effet incertain." },
-    { id: "changeMind", stage: 2, type: "text",
-      label: "Quelle information aurait pu te faire changer d’avis avant d’engager ?",
-      help: "Une condition observable, pas seulement « si j’avais su que j’allais perdre »." },
-    { id: "judgment", stage: 3, type: "choice",
-      label: "Avec les informations disponibles avant le combat, comment qualifies-tu ton choix ?",
-      help: "ANGLE ne sélectionne aucune conclusion à ta place.",
-      options: [["defensible", "Une décision défendable"], ["review", "Une décision que je souhaite revoir"], ["uncertain", "Je n’ai pas assez d’informations pour conclure"]] },
-    { id: "reason", stage: 3, type: "text",
-      label: "Quel élément de ton raisonnement soutient cette conclusion ?",
-      help: "Si le résultat avait été inverse, garderais-tu cette justification ? Explique." },
-    { id: "signal", stage: 3, type: "text",
-      label: "Quel signal concret veux-tu vérifier avant un prochain engagement ?",
-      help: "Facultatif. Tu peux aussi choisir de ne rien changer pour l’instant.", optional: true }
-  ];
-  const byId = new Map(QUESTIONS.map((q) => [q.id, q]));
-  let storageOK = true, toastTimer, current = null, records = [], draft = null;
-  let effects = null, viewFrame = 0;
+   Règles tenues dans ce fichier :
+   • aucune donnée saisie n'est interprétée comme du HTML (textContent only) ;
+   • toute lecture du stockage est validée avant usage ;
+   • l'absence de stockage ou son saturation dégrade l'expérience sans la casser ;
+   • aucun minuteur ne retarde une action : les animations accompagnent, elles
+     ne conditionnent jamais l'état.
+   ========================================================================== */
+(function () {
+  'use strict';
 
-  function node(tag, className = "", text = "") {
-    const element = document.createElement(tag);
-    if (className) element.className = className;
-    if (text !== "") element.textContent = text;
-    return element;
+  /* ------------------------------------------------------------------ 01. Référentiels */
+
+  var CATEGORIES = {
+    creer: { nom: 'Créer', court: 'Créer', scene: 'ill-creer', picto: 'g-creer' },
+    observer: { nom: 'Observer', court: 'Observer', scene: 'ill-observer', picto: 'g-observer' },
+    reflechir: { nom: 'Réfléchir', court: 'Réfléchir', scene: 'ill-reflechir', picto: 'g-reflechir' },
+    bouger: { nom: 'Bouger doucement', court: 'Bouger', scene: 'ill-bouger', picto: 'g-bouger' },
+    partager: { nom: 'Partager', court: 'Partager', scene: 'ill-partager', picto: 'g-partager' }
+  };
+
+  var CONTEXTES = {
+    maison: 'Chez moi',
+    bureau: 'Au bureau',
+    dehors: 'Dehors',
+    trajet: 'En déplacement',
+    ensemble: 'Avec quelqu’un'
+  };
+
+  var STATUTS = { realise: 'Réalisé', essaye: 'Essayé', passe: 'Passé' };
+  var DUREES = [5, 15, 30];
+  var CLE = 'declic.v1';
+  var VERSION = 1;
+
+  var BIBLIO = Array.isArray(window.DECLIC_DEFIS) ? window.DECLIC_DEFIS.slice() : [];
+
+  /* ------------------------------------------------------------------ 02. Utilitaires */
+
+  function $(sel, ctx) { return (ctx || document).querySelector(sel); }
+  function $$(sel, ctx) { return Array.prototype.slice.call((ctx || document).querySelectorAll(sel)); }
+
+  function el(balise, classe, texte) {
+    var n = document.createElement(balise);
+    if (classe) n.className = classe;
+    if (texte !== undefined && texte !== null) n.textContent = texte;
+    return n;
   }
-  function button(text, className, action) {
-    const element = node("button", `button ${className}`, text);
-    element.type = "button";
-    element.addEventListener("click", action);
-    return element;
+
+  function svgInterne(contenu, classe, viewBox) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', viewBox || '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    if (classe) svg.setAttribute('class', classe);
+    svg.innerHTML = contenu;
+    return svg;
   }
-  function toast(message) {
-    const element = $("#toast");
-    element.textContent = message;
-    element.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { element.hidden = true; }, 6500);
+
+  function icone(id, classe) {
+    return svgInterne('<use href="#' + id + '"></use>', classe);
   }
-  function storageFailure(message = "") {
-    storageOK = false;
-    warning.hidden = false;
-    warning.textContent = message || "Stockage indisponible ou données illisibles : tes changements restent uniquement dans cet onglet. Exporte tes données avant de le fermer. Les anciennes données illisibles ne sont pas remplacées.";
-    updateCounters();
+
+  function normaliser(texte) {
+    return String(texte || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[’']/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
   }
-  function activeQuestions(answers) { return QUESTIONS.filter((q) => !q.when || q.when(answers)); }
-  function cleanAnswers(answers) {
-    const cleaned = {};
-    for (const q of QUESTIONS) {
-      const value = answers[q.id];
-      if (typeof value !== "string") continue;
-      if (q.type === "choice") {
-        if (q.options.some(([key]) => key === value)) cleaned[q.id] = value;
-      } else cleaned[q.id] = value.slice(0, 4000);
-    }
-    for (const q of QUESTIONS) if (q.when && !q.when(cleaned)) delete cleaned[q.id];
-    return cleaned;
-  }
-  function validRecord(record) {
-    return record && typeof record === "object" && record.version === 1 &&
-      typeof record.id === "string" && typeof record.createdAt === "string" &&
-      Number.isFinite(Date.parse(record.createdAt)) && typeof record.story === "string" &&
-      typeof record.title === "string" && record.setup && typeof record.setup === "object" &&
-      ["single", "group"].includes(record.setup.format) &&
-      Object.prototype.hasOwnProperty.call(OUTCOMES, record.setup.outcome) &&
-      Object.prototype.hasOwnProperty.call(MODES, record.setup.mode) &&
-      Object.prototype.hasOwnProperty.call(TEAMS, record.setup.team) &&
-      record.answers && typeof record.answers === "object" && !Array.isArray(record.answers);
-  }
-  function normalizeRecord(record) {
-    return {
-      version: 1, id: record.id.slice(0, 120), createdAt: record.createdAt,
-      title: record.title.slice(0, 80), story: record.story.slice(0, 6000),
-      setup: { format: record.setup.format, outcome: record.setup.outcome, mode: record.setup.mode, team: record.setup.team },
-      answers: cleanAnswers(record.answers),
-      step: ["setup", "story", "questions", "summary"].includes(record.step) ? record.step : "setup",
-      cursor: Number.isInteger(record.cursor) && record.cursor >= 0 ? record.cursor : 0
-    };
-  }
-  function readStorage(key, fallback, validate) {
-    // Une clé corrompue ne doit pas empêcher la lecture d'une autre clé valide.
+
+  function dateLisible(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return 'date inconnue';
     try {
-      const raw = localStorage.getItem(key);
-      if (raw === null) return fallback;
-      const value = JSON.parse(raw);
-      if (!validate(value)) throw new Error("Format de stockage invalide");
-      return value;
-    } catch { storageFailure(); return fallback; }
+      return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+    } catch (e) {
+      return d.toLocaleDateString();
+    }
   }
-  function writeStorage(key, value) {
-    if (!storageOK) return false;
+
+  function horodatage() { return new Date().toISOString(); }
+
+  function identifiantUnique() {
+    var base = 'page-' + Date.now().toString(36);
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return 'page-' + window.crypto.randomUUID();
+    }
+    return base + '-' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function trouverDefi(id) {
+    for (var i = 0; i < BIBLIO.length; i++) if (BIBLIO[i].id === id) return BIBLIO[i];
+    return null;
+  }
+
+  function indexDefi(id) {
+    for (var i = 0; i < BIBLIO.length; i++) if (BIBLIO[i].id === id) return i;
+    return -1;
+  }
+
+  function annoncer(message) {
+    var zone = $('[data-annonce]');
+    if (!zone) return;
+    zone.textContent = '';
+    window.setTimeout(function () { zone.textContent = message; }, 60);
+  }
+
+  function reduireMouvement() {
+    return typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  function defilementDoux(cible) {
     try {
-      if (value === null) localStorage.removeItem(key);
-      else localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch { storageFailure(); return false; }
+      cible.scrollIntoView({ block: 'nearest', behavior: reduireMouvement() ? 'auto' : 'smooth' });
+    } catch (e) {
+      cible.scrollIntoView(false);
+    }
   }
-  function updateCounters() {
-    $("#history-count").textContent = String(records.length);
-    $("#resume-button").hidden = !draft;
-    const status = $("#draft-status");
-    if (status) status.textContent = storageOK ? "Brouillon enregistré dans ce navigateur." : "Brouillon en mémoire dans cet onglet uniquement.";
-  }
-  function structuredCopy(value) { return JSON.parse(JSON.stringify(value)); }
-  function saveDraft() {
-    if (!current) return;
-    draft = structuredCopy(current);
-    writeStorage(KEYS.draft, draft);
-    updateCounters();
-  }
-  function focusView(heading) {
-    cancelAnimationFrame(viewFrame);
-    viewFrame = requestAnimationFrame(() => {
-      if (!heading.isConnected) return;
-      heading.focus({ preventScroll: true });
-      window.scrollTo({ top: 0, behavior: "instant" });
-      effects?.enterWorkspace(workspace);
+
+  /* ------------------------------------------------------------------ 03. Validation de la bibliothèque */
+
+  function validerBibliotheque(liste) {
+    var valides = [];
+    var rejets = [];
+    var vus = Object.create(null);
+
+    liste.forEach(function (d) {
+      var souci = null;
+      if (!d || typeof d !== 'object') souci = 'entrée non exploitable';
+      else if (!d.id || typeof d.id !== 'string') souci = 'identifiant manquant';
+      else if (vus[d.id]) souci = 'identifiant en double : ' + d.id;
+      else if (!CATEGORIES[d.categorie]) souci = 'catégorie inconnue : ' + d.id;
+      else if (DUREES.indexOf(Number(d.duree)) === -1) souci = 'durée invalide : ' + d.id;
+      else if (!Array.isArray(d.etapes) || d.etapes.length < 2) souci = 'étapes insuffisantes : ' + d.id;
+      else if (!Array.isArray(d.contextes) || !d.contextes.length) souci = 'aucun contexte : ' + d.id;
+
+      if (souci) { rejets.push(souci); return; }
+      vus[d.id] = true;
+      valides.push(d);
     });
+
+    return { valides: valides, rejets: rejets };
   }
-  function showBase(title, eyebrow, description, wide = false) {
-    home.hidden = true;
-    workspace.hidden = false;
-    workspace.className = `workspace${wide ? " wide" : ""}`;
-    workspace.replaceChildren();
-    effects?.setHome(false);
-    const kicker = node("div", "kicker");
-    kicker.append(node("span", "", eyebrow), node("span", "", "ANGLE / V1"));
-    const heading = node("h1", "", title);
-    heading.tabIndex = -1;
-    workspace.append(kicker, heading);
-    if (description) workspace.append(node("p", "intro", description));
-    $$("[data-nav]").forEach((link) => link.removeAttribute("aria-current"));
-    if (eyebrow === "MÉMOIRE LOCALE") $('[data-nav="history"]').setAttribute("aria-current", "page");
-    focusView(heading);
-  }
-  function showHome() {
-    cancelAnimationFrame(viewFrame);
-    home.hidden = false;
-    workspace.hidden = true;
-    $$("[data-nav]").forEach((link) => link.removeAttribute("aria-current"));
-    $('[data-nav="home"]').setAttribute("aria-current", "page");
-    updateCounters();
-    $("#hero-title").focus({ preventScroll: true });
-    window.scrollTo({ top: 0, behavior: "instant" });
-    effects?.setHome(true);
-  }
-  function addDraftStatus() {
-    const status = node("p", "save-state"); status.id = "draft-status";
-    workspace.append(status); updateCounters();
-  }
-  function makeNotice(text) { return node("p", "notice", text); }
-  function makeError(form) {
-    const error = node("p", "form-error"); error.setAttribute("role", "alert"); error.hidden = true;
-    form.append(error); return error;
-  }
-  function clearError(form, error) {
-    error.hidden = true;
-    $$(".invalid-field", form).forEach((element) => element.classList.remove("invalid-field"));
-    $$("[aria-invalid]", form).forEach((element) => element.removeAttribute("aria-invalid"));
-  }
-  function fail(error, message, target) {
-    error.textContent = message; error.hidden = false;
-    if (target) {
-      target.setAttribute("aria-invalid", "true");
-      target.closest(".field")?.classList.add("invalid-field");
-      target.focus();
-    }
-  }
-  function choiceField(id, label, options, value, onChange, help = "") {
-    const field = node("fieldset", "field"); field.id = `field-${id}`;
-    field.append(node("legend", "", label));
-    if (help) {
-      const description = node("p", "field-help", help); description.id = `help-${id}`;
-      field.append(description); field.setAttribute("aria-describedby", description.id);
-    }
-    const choices = node("div", "choices");
-    for (const [key, text] of options) {
-      const wrapper = node("label", `choice${value === key ? " selected" : ""}`);
-      const input = document.createElement("input");
-      input.type = "radio"; input.name = id; input.value = key; input.checked = value === key;
-      input.addEventListener("change", () => {
-        $$(".choice", choices).forEach((item) => item.classList.remove("selected"));
-        wrapper.classList.add("selected");
-        field.classList.remove("invalid-field");
-        $$("[aria-invalid]", field).forEach((item) => item.removeAttribute("aria-invalid"));
-        onChange(key);
-        effects?.select(wrapper);
-      });
-      wrapper.append(input, node("span", "", text)); choices.append(wrapper);
-    }
-    field.append(choices); return field;
-  }
-  function textField(id, label, value, onChange, options = {}) {
-    const field = node("div", "field");
-    const labelNode = node("label", "", label); labelNode.htmlFor = id; field.append(labelNode);
-    if (options.help) {
-      const description = node("p", "field-help", options.help); description.id = `help-${id}`; field.append(description);
-    }
-    const input = document.createElement(options.short ? "input" : "textarea");
-    if (options.short) input.type = "text";
-    input.id = id; input.value = value || ""; input.maxLength = options.maxLength || 4000;
-    input.placeholder = options.placeholder || "";
-    if (options.story) input.className = "story-input";
-    if (options.help) input.setAttribute("aria-describedby", `help-${id}`);
-    input.addEventListener("input", () => {
-      input.removeAttribute("aria-invalid"); field.classList.remove("invalid-field"); onChange(input.value);
-    });
-    field.append(input);
-    if (options.unknown) field.append(button("Je ne sais plus", "ghost small", () => {
-      input.value = UNKNOWN; input.removeAttribute("aria-invalid"); field.classList.remove("invalid-field");
-      onChange(UNKNOWN); input.focus();
-    }));
-    return field;
-  }
-  function selectField(id, label, choices, value, onChange) {
-    const field = node("div", "field"); const labelNode = node("label", "", label); labelNode.htmlFor = id;
-    const select = document.createElement("select"); select.id = id;
-    for (const [key, text] of choices) { const option = node("option", "", text); option.value = key; select.append(option); }
-    select.value = value; select.addEventListener("change", () => onChange(select.value));
-    field.append(labelNode, select); return field;
-  }
-  function newAnalysis() {
-    if (draft && !window.confirm("Un brouillon existe. Le remplacer par une nouvelle analyse ?")) return;
-    current = {
-      version: 1, id: `angle-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      createdAt: new Date().toISOString(), title: "", story: "",
-      setup: { format: "single", outcome: "lost", mode: "zero", team: "solo" },
-      answers: {}, step: "setup", cursor: 0
-    };
-    showSetup();
-  }
-  function resumeDraft() {
-    if (!draft) return;
-    current = structuredCopy(draft);
-    if (current.step === "story") showStory();
-    else if (current.step === "questions") showQuestions(current.cursor);
-    else if (current.step === "summary") showSummary(current, false);
-    else showSetup();
-  }
-  function showSetup() {
-    current.step = "setup"; saveDraft();
-    showBase("Reviens au moment du choix.", "AVANT DE COMMENCER", "Cette première version examine la décision d’engager. Continuer, poursuivre et se retirer ne sont pas encore des parcours séparés.");
-    workspace.append(makeNotice("Analyse une victoire comme une défaite : le résultat ne suffit pas à qualifier la décision. ANGLE ne lit ni ton replay ni ton récit avec une IA."));
-    const form = node("form", "panel");
-    form.append(choiceField("format", "Comment veux-tu avancer ?", [["single", "Une question à la fois — pour te concentrer"], ["group", "Plusieurs questions par écran — pour comparer"]], current.setup.format, (value) => { current.setup.format = value; saveDraft(); }));
-    form.append(choiceField("outcome", "Quel fight veux-tu analyser ?", Object.entries(OUTCOMES), current.setup.outcome, (value) => { current.setup.outcome = value; saveDraft(); }, "Ce choix décrit l’issue. Il ne déclenche aucun verdict ni aucune branche de jugement."));
-    form.append(selectField("mode", "Mode", Object.entries(MODES), current.setup.mode, (value) => { current.setup.mode = value; saveDraft(); }));
-    form.append(selectField("team", "Format d’équipe", Object.entries(TEAMS), current.setup.team, (value) => { current.setup.team = value; saveDraft(); }));
-    const actions = node("div", "actions"); actions.append(button("Accueil", "ghost", showHome));
-    const next = node("button", "button primary", "Raconter mon fight →"); next.type = "submit";
-    actions.append(next); form.append(actions);
-    form.addEventListener("submit", (event) => { event.preventDefault(); showStory(); });
-    workspace.append(form); addDraftStatus();
-  }
-  function showStory() {
-    current.step = "story"; saveDraft();
-    showBase("Pose la scène.", "TON RÉCIT", "Raconte avec tes mots. Les questions suivantes s’adapteront à tes choix structurés, pas à une interprétation automatique de ce texte.");
-    const form = node("form", "panel");
-    form.append(textField("analysis-title", "Un titre pour retrouver ce fight — facultatif", current.title, (value) => { current.title = value; saveDraft(); }, { short: true, maxLength: 80, placeholder: "Ex. La hauteur en Top 15" }));
-    const hints = node("div", "recap-hints");
-    ["Où étais-tu ?", "Pourquoi engager ?", "Comment ça s’est terminé ?"].forEach((text) => hints.append(node("span", "chip", text)));
-    form.append(hints, textField("story", "Ton combat, juste avant et après la décision d’engager", current.story, (value) => { current.story = value; saveDraft(); }, {
-      story: true, maxLength: 6000,
-      placeholder: "Position, zone, informations connues, raison de l’engagement, puis résultat…",
-      help: "Évite les informations personnelles. Un récit court suffit."
-    }));
-    const error = makeError(form); const actions = node("div", "actions");
-    actions.append(button("← Préparation", "secondary", showSetup));
-    const next = node("button", "button primary", "Examiner mon choix →"); next.type = "submit";
-    actions.append(next); form.append(actions);
-    form.addEventListener("submit", (event) => {
-      event.preventDefault(); clearError(form, error);
-      if (current.story.trim().length < 15) { fail(error, "Décris brièvement la scène : au moins 15 caractères.", $("#story")); return; }
-      showQuestions(0);
-    });
-    workspace.append(form); addDraftStatus();
-  }
-  function setAnswer(id, value) { current.answers[id] = value; current.answers = cleanAnswers(current.answers); saveDraft(); }
-  function questionCard(q, number) {
-    const card = node("article", "panel question-card");
-    card.append(node("span", "question-number", `REPÈRE ${String(number).padStart(2, "0")}`));
-    if (q.type === "choice") card.append(choiceField(q.id, q.label, q.options, current.answers[q.id], (value) => setAnswer(q.id, value), q.help));
-    else card.append(textField(q.id, q.label, current.answers[q.id], (value) => setAnswer(q.id, value), {
-      help: q.help, unknown: !q.optional,
-      placeholder: q.optional ? "Un signal observable, ou laisse ce champ vide." : "Ton raisonnement, sans chercher la réponse attendue…"
-    }));
-    return card;
-  }
-  function validateQuestions(questions, error) {
-    for (const q of questions) {
-      const value = current.answers[q.id];
-      if (!q.optional && (typeof value !== "string" || !value.trim())) {
-        const target = q.type === "choice" ? document.querySelector(`input[name="${q.id}"]`) : document.getElementById(q.id);
-        fail(error, "Une réponse manque. Tu peux utiliser « Je ne sais plus » si nécessaire.", target); return false;
+
+  /* ------------------------------------------------------------------ 04. Stockage */
+
+  var stockage = {
+    disponible: false,
+    ecritureOk: true,
+    raison: '',
+    verifier: function () {
+      try {
+        var t = '__declic_test__';
+        window.localStorage.setItem(t, '1');
+        window.localStorage.removeItem(t);
+        this.disponible = true;
+      } catch (e) {
+        this.disponible = false;
+        this.raison = 'Le stockage local est indisponible dans ce navigateur (navigation privée, réglage de confidentialité ou espace bloqué).';
       }
+      return this.disponible;
+    },
+    lire: function () {
+      if (!this.disponible) return null;
+      try { return window.localStorage.getItem(CLE); } catch (e) { return null; }
+    },
+    ecrire: function (valeur) {
+      if (!this.disponible) return false;
+      try {
+        window.localStorage.setItem(CLE, valeur);
+        this.ecritureOk = true;
+        return true;
+      } catch (e) {
+        this.ecritureOk = false;
+        var plein = e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22);
+        afficherBanniereStockage(plein
+          ? 'Le stockage de ton navigateur est plein. Tes changements restent utilisables dans cette page, mais risquent de ne pas survivre à un rechargement. Pense à exporter ton carnet.'
+          : 'L’enregistrement local a échoué. Tes changements restent utilisables dans cette page, mais ne seront pas conservés après rechargement. Tu peux exporter ton carnet.');
+        return false;
+      }
+    },
+    mettreDeCote: function (brut) {
+      try {
+        if (this.disponible) window.localStorage.setItem(CLE + '.illisible.' + Date.now(), brut);
+      } catch (e) { /* tant pis : on ne bloque pas l'usage */ }
     }
+  };
+
+  function modeleVide() {
+    return {
+      version: VERSION,
+      favoris: [],
+      carnet: [],
+      atelier: { duree: null, categorie: null, contexte: null, defiId: null, ouverte: false }
+    };
+  }
+
+  function normaliserModele(brut) {
+    var base = modeleVide();
+    var ignorees = 0;
+    if (!brut || typeof brut !== 'object') return { modele: base, ignorees: 0 };
+
+    if (Array.isArray(brut.favoris)) {
+      brut.favoris.forEach(function (id) {
+        if (typeof id === 'string' && trouverDefi(id) && base.favoris.indexOf(id) === -1) base.favoris.push(id);
+        else ignorees++;
+      });
+    }
+
+    if (Array.isArray(brut.carnet)) {
+      brut.carnet.forEach(function (p) {
+        if (!p || typeof p !== 'object') { ignorees++; return; }
+        if (!trouverDefi(p.defiId)) { ignorees++; return; }
+        if (!STATUTS[p.statut]) { ignorees++; return; }
+        var note = typeof p.note === 'string' ? p.note.slice(0, 2000) : '';
+        var cree = new Date(p.cree);
+        var maj = new Date(p.maj || p.cree);
+        base.carnet.push({
+          id: typeof p.id === 'string' && p.id ? p.id.slice(0, 80) : identifiantUnique(),
+          defiId: p.defiId,
+          statut: p.statut,
+          note: note,
+          cree: isNaN(cree.getTime()) ? horodatage() : cree.toISOString(),
+          maj: isNaN(maj.getTime()) ? horodatage() : maj.toISOString()
+        });
+      });
+    }
+
+    if (brut.atelier && typeof brut.atelier === 'object') {
+      var a = brut.atelier;
+      base.atelier.duree = DUREES.indexOf(Number(a.duree)) !== -1 ? Number(a.duree) : null;
+      base.atelier.categorie = CATEGORIES[a.categorie] ? a.categorie : null;
+      base.atelier.contexte = CONTEXTES[a.contexte] ? a.contexte : null;
+      base.atelier.defiId = trouverDefi(a.defiId) ? a.defiId : null;
+      base.atelier.ouverte = a.ouverte === true && !!base.atelier.defiId;
+    }
+
+    return { modele: base, ignorees: ignorees };
+  }
+
+  /* ------------------------------------------------------------------ 05. État */
+
+  var etat = {
+    modele: modeleVide(),
+    defiCourantId: null,
+    suppressionId: null,
+    importEnAttente: null,
+    premierRoutage: true,
+    banniereLue: false
+  };
+
+  function sauvegarder() {
+    etat.modele.version = VERSION;
+    return stockage.ecrire(JSON.stringify(etat.modele));
+  }
+
+  function estFavori(id) { return etat.modele.favoris.indexOf(id) !== -1; }
+
+  function faireBasculerFavori(id) {
+    var i = etat.modele.favoris.indexOf(id);
+    if (i === -1) etat.modele.favoris.push(id);
+    else etat.modele.favoris.splice(i, 1);
+    sauvegarder();
+    majPastilles();
+    return i === -1;
+  }
+
+  function afficherBanniereStockage(message) {
+    var zone = $('#etat-stockage');
+    if (!zone) return;
+    zone.textContent = message;
+    zone.hidden = false;
+    if (!etat.banniereLue) {
+      etat.banniereLue = true;
+      annoncer(message);
+    }
+  }
+
+  /* ------------------------------------------------------------------ 06. Correspondance & filtres */
+
+  function correspondre(defi, f) {
+    if (f.duree && Number(defi.duree) !== Number(f.duree)) return false;
+    if (f.categorie && defi.categorie !== f.categorie) return false;
+    if (f.contexte && defi.contextes.indexOf(f.contexte) === -1) return false;
     return true;
   }
-  function showQuestions(cursor = 0) {
-    current.step = "questions"; current.answers = cleanAnswers(current.answers);
-    const active = activeQuestions(current.answers), grouped = current.setup.format === "group";
-    const count = grouped ? STAGES.length : active.length;
-    current.cursor = Math.max(0, Math.min(cursor, count - 1)); saveDraft();
-    const visible = grouped ? active.filter((q) => q.stage === current.cursor) : [active[current.cursor]];
-    const stage = grouped ? current.cursor : visible[0].stage;
-    showBase(STAGES[stage], `LE MOMENT D’ENGAGER / ${current.cursor + 1} SUR ${count}`, "Reviens aux informations disponibles avant d’agir. Une incertitude vaut mieux qu’une explication inventée après coup.");
-    const progress = document.createElement("progress"); progress.className = "progress";
-    progress.max = count; progress.value = current.cursor + 1;
-    progress.setAttribute("aria-label", "Avancement dans le parcours, pas un score"); workspace.append(progress);
-    const recall = node("details"); recall.append(node("summary", "", "Relire mon récit"), node("p", "quote", current.story)); workspace.append(recall);
-    const form = node("form"); visible.forEach((q) => form.append(questionCard(q, active.indexOf(q) + 1)));
-    const error = makeError(form), actions = node("div", "actions");
-    actions.append(button("← Retour", "secondary", () => { if (current.cursor === 0) showStory(); else showQuestions(current.cursor - 1); }));
-    const next = node("button", "button primary", current.cursor === count - 1 ? "Construire ma synthèse →" : "Continuer →");
-    next.type = "submit"; actions.append(next); form.append(actions);
-    form.addEventListener("submit", (event) => {
-      event.preventDefault(); clearError(form, error);
-      if (!validateQuestions(visible, error)) return;
-      const updatedCount = grouped ? STAGES.length : activeQuestions(current.answers).length;
-      if (current.cursor >= updatedCount - 1) showSummary(current, false); else showQuestions(current.cursor + 1);
+
+  function defisCorrespondants(f) { return BIBLIO.filter(function (d) { return correspondre(d, f); }); }
+
+  function texteCherchable(defi) {
+    return normaliser([
+      defi.titre,
+      defi.consigne,
+      CATEGORIES[defi.categorie].nom,
+      defi.materiel.join(' '),
+      defi.etapes.join(' '),
+      defi.variante,
+      defi.question,
+      defi.contextes.map(function (c) { return CONTEXTES[c]; }).join(' ')
+    ].join(' '));
+  }
+
+  function descriptionsFiltres(f) {
+    var morceaux = [];
+    if (f.categorie) morceaux.push(CATEGORIES[f.categorie].nom.toLowerCase());
+    if (f.duree) morceaux.push(f.duree + ' minutes');
+    if (f.contexte) morceaux.push(CONTEXTES[f.contexte].toLowerCase());
+    return morceaux;
+  }
+
+  /* ------------------------------------------------------------------ 07. Routeur */
+
+  var TITRES = {
+    accueil: 'DÉCLIC — Quelques minutes. Une autre façon de voir.',
+    trouver: 'Compose ton déclic — DÉCLIC',
+    explorer: 'Explorer les idées — DÉCLIC',
+    favoris: 'Mes favoris — DÉCLIC',
+    carnet: 'Mon carnet — DÉCLIC'
+  };
+
+  function analyserHash() {
+    var brut = window.location.hash.replace(/^#\/?/, '');
+    var parties = brut.split('?');
+    var chemin = parties[0] || '';
+    var params = new URLSearchParams(parties[1] || '');
+    var segments = chemin.split('/').filter(Boolean);
+
+    if (!segments.length) return { vue: 'accueil', params: params };
+    if (segments[0] === 'defi' && segments[1]) {
+      return { vue: 'defi', id: decodeURIComponent(segments[1]), params: params };
+    }
+    if (TITRES[segments[0]]) return { vue: segments[0], params: params };
+    return { vue: 'accueil', params: params, inconnu: true };
+  }
+
+  function afficherVue(nom, options) {
+    options = options || {};
+    var sections = $$('[data-vue]');
+    sections.forEach(function (s) {
+      var actif = s.getAttribute('data-vue') === nom;
+      s.hidden = !actif;
     });
-    workspace.append(form); addDraftStatus();
+
+    var nav = $$('.nav a');
+    nav.forEach(function (a) {
+      if (a.getAttribute('data-nav') === nom) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+
+    document.title = TITRES[nom] || TITRES.accueil;
+
+    if (options.focus) {
+      var cible = $('#titre-' + nom) || $('#' + nom + ' h1');
+      if (cible) {
+        try { cible.focus({ preventScroll: true }); } catch (e) { cible.focus(); }
+      }
+      var hautVue = $('[data-vue="' + nom + '"]');
+      if (hautVue && hautVue.getBoundingClientRect().top < -4) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      }
+    }
   }
-  function answerLabel(id, value) {
-    const q = byId.get(id);
-    if (!q || !value) return "Non renseigné";
-    return q.type === "choice" ? q.options.find(([key]) => key === value)?.[1] || "Non renseigné" : value;
+
+  function router() {
+    var r = analyserHash();
+    var nomVue = r.vue === 'defi' ? 'trouver' : r.vue;
+
+    afficherVue(nomVue, { focus: !etat.premierRoutage });
+    etat.premierRoutage = false;
+
+    if (r.vue === 'defi') {
+      ouvrirDefiDepuisRoute(r.id);
+      return;
+    }
+
+    if (r.vue === 'explorer') {
+      appliquerParamsExplorer(r.params);
+      rendreExplorer({ depuisRoute: true });
+    } else if (r.vue === 'favoris') {
+      rendreFavoris();
+    } else if (r.vue === 'carnet') {
+      rendreCarnet();
+    } else if (r.vue === 'trouver') {
+      majCarte();
+    }
   }
-  function definitionList(entries) {
-    const list = node("dl", "answer-list");
-    for (const [label, value] of entries) list.append(node("dt", "", label), node("dd", "", value));
-    return list;
-  }
-  function summaryPanel(title, entries, full = false) {
-    const panel = node("article", `panel${full ? " full" : ""}`);
-    panel.append(node("h2", "", title), definitionList(entries)); return panel;
-  }
-  function summaryData(record) {
-    const answers = cleanAnswers(record.answers), active = activeQuestions(answers);
-    const unknown = (q) => {
-      const value = answers[q.id];
-      return !value || value === "unknown" || value === UNKNOWN || (value === "other" && q.id === "motive");
-    };
+
+  /* ------------------------------------------------------------------ 08. Atelier : la carte */
+
+  var carte = $('#carte');
+  var depliage = $('#carte-depliage');
+  var btnOuvrir = $('#btn-ouvrir');
+  var formulaireAtelier = $('#reglages');
+
+  var els = {
+    ouvrirTexte: $('[data-ouvrir-texte]'),
+    tempsValeur: $('[data-temps-valeur]'),
+    tempsUnite: $('[data-temps-unite]'),
+    motif: $('[data-motif]'),
+    motifVide: $('[data-motif-vide]'),
+    motifScene: $('[data-motif-scene]'),
+    motifUse: $('[data-motif-use]'),
+    etiquette: $('[data-etiquette]'),
+    etiquetteTexte: $('[data-etiquette-texte]'),
+    etiquettePicto: $('[data-etiquette-picto] use'),
+    invitation: $('#invitation-carte'),
+    numero: $('[data-numero]'),
+    actions: $('[data-carte-actions]'),
+    piedNote: $('[data-pied-note]'),
+    btnAutre: $('#btn-autre'),
+    btnFavori: $('#btn-favori'),
+    favoriTexte: $('[data-favori-texte]'),
+    btnEnregistrer: $('#btn-enregistrer'),
+    tampon: $('[data-tampon]'),
+    tamponTexte: $('[data-tampon-texte]'),
+    defi: $('#defi'),
+    defiCategorie: $('[data-defi-categorie]'),
+    defiDuree: $('[data-defi-duree]'),
+    defiContexte: $('[data-defi-contexte]'),
+    defiTitre: $('[data-defi-titre]'),
+    defiConsigne: $('[data-defi-consigne]'),
+    defiEtapes: $('[data-defi-etapes]'),
+    defiMateriel: $('[data-defi-materiel]'),
+    defiVariante: $('[data-defi-variante]'),
+    defiQuestion: $('[data-defi-question]'),
+    defiSource: $('.defi__source'),
+    vide: $('[data-carte-vide]'),
+    videTitre: $('[data-vide-titre]'),
+    videTexte: $('[data-vide-texte]'),
+    videActions: $('[data-vide-actions]'),
+    aideEnvie: $('[data-aide-envie]')
+  };
+
+  var minuteries = { motif: 0, tampon: 0, enregistrer: 0 };
+
+  function filtresAtelier() {
+    if (!formulaireAtelier) return { duree: null, categorie: null, contexte: null };
+    var d = formulaireAtelier.querySelector('input[name="duree"]:checked');
+    var c = formulaireAtelier.querySelector('input[name="categorie"]:checked');
+    var x = formulaireAtelier.querySelector('input[name="contexte"]:checked');
     return {
-      answers,
-      established: active.filter((q) => q.stage < 3 && !unknown(q)).map((q) => [q.label, answerLabel(q.id, answers[q.id])]),
-      missing: active.filter((q) => !q.optional && unknown(q)).map((q) => q.label)
+      duree: d ? Number(d.value) : null,
+      categorie: c ? c.value : null,
+      contexte: x ? x.value : null
     };
   }
-  function showSummary(record, saved) {
-    if (!saved) { current.step = "summary"; saveDraft(); }
-    const { answers, established, missing } = summaryData(record);
-    showBase(record.title.trim() || "Ton débrief.", saved ? "ANALYSE CONSERVÉE" : "SYNTHÈSE À RELIRE", "Cette fiche reprend tes réponses. Elle ne vérifie pas les faits du match et ne juge pas automatiquement la qualité du combat.", true);
-    const meta = node("div", "recap-hints");
-    [OUTCOMES[record.setup.outcome], MODES[record.setup.mode], TEAMS[record.setup.team]].forEach((text) => meta.append(node("span", "chip", text)));
-    workspace.append(meta);
-    const grid = node("div", "summary-grid"), storyPanel = node("article", "panel full"), storyDetails = node("details");
-    storyDetails.append(node("summary", "", "Ton récit original"), node("p", "quote", record.story)); storyPanel.append(storyDetails); grid.append(storyPanel);
-    grid.append(summaryPanel("Éléments établis dans tes réponses", established.length ? established : [["État", "Aucun élément suffisamment renseigné."]], true));
-    const unknownPanel = node("article", "panel"); unknownPanel.append(node("h2", "", "Informations manquantes"));
-    const missingList = node("ul", "missing-list");
-    if (missing.length) missing.forEach((text) => missingList.append(node("li", "", text)));
-    else missingList.append(node("li", "", "Aucun champ requis n’a été laissé inconnu. Cela ne garantit pas que toutes les informations utiles du match sont présentes."));
-    unknownPanel.append(missingList); grid.append(unknownPanel);
-    const reconsider = node("article", "panel"); reconsider.append(node("h2", "", "Points à reconsidérer"));
-    if (answers.judgment === "review") reconsider.append(definitionList([["Point que tu souhaites revoir", answers.reason || "Non précisé"]]));
-    else reconsider.append(node("p", "quote", "Aucune erreur n’est déduite automatiquement. Ta conclusion reste celle que tu as choisie, avec les limites des informations rapportées."));
-    reconsider.append(definitionList([["Signal que tu souhaites vérifier", answers.signal?.trim() || "Aucun signal ajouté"]])); grid.append(reconsider);
-    grid.append(summaryPanel("Ta conclusion, pas celle d’ANGLE", [["Ton appréciation", answerLabel("judgment", answers.judgment)], ["Ta justification", answers.reason || "Non renseignée"]], true));
-    workspace.append(grid);
-    const actions = node("div", "actions");
-    if (!saved) {
-      actions.append(button("← Revoir mes réponses", "secondary", () => showQuestions(current.setup.format === "group" ? STAGES.length - 1 : activeQuestions(current.answers).length - 1)));
-      const save = button("Conserver cette analyse", "primary", async () => {
-        if (!current || save.disabled) return;
-        const all = activeQuestions(current.answers);
-        const incomplete = all.find((q) => !q.optional && !current.answers[q.id]?.trim());
-        if (incomplete) {
-          toast("Une réponse requise manque. Reviens au parcours pour la compléter.");
-          showQuestions(current.setup.format === "group" ? incomplete.stage : all.indexOf(incomplete)); return;
-        }
-        // Un frame permet au navigateur d'afficher le vrai état d'enregistrement.
-        // Aucun délai artificiel ni fausse analyse par IA.
-        save.disabled = true; save.setAttribute("aria-busy", "true");
-        const stored = structuredCopy(current);
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        stored.answers = cleanAnswers(stored.answers);
-        records = [stored, ...records.filter((item) => item.id !== stored.id)];
-        const persisted = writeStorage(KEYS.history, records);
-        draft = null; current = null; writeStorage(KEYS.draft, null); updateCounters();
-        showSummary(stored, true);
-        toast(persisted && storageOK ? "Analyse conservée dans ce navigateur." : "Analyse conservée uniquement dans cet onglet. Pense à l’exporter.");
-      }); actions.append(save);
+
+  function filtresComplets(f) { return !!(f.duree && f.categorie && f.contexte); }
+
+  function reglerRadios(f) {
+    if (!formulaireAtelier) return;
+    [['duree', f.duree], ['categorie', f.categorie], ['contexte', f.contexte]].forEach(function (paire) {
+      var nom = paire[0];
+      var valeur = paire[1];
+      $$('input[name="' + nom + '"]', formulaireAtelier).forEach(function (input) {
+        input.checked = valeur !== null && valeur !== undefined && String(input.value) === String(valeur);
+      });
+    });
+  }
+
+  function majMotif(categorie) {
+    if (!els.motif) return;
+    window.clearTimeout(minuteries.motif);
+
+    if (!categorie) {
+      els.motif.setAttribute('data-motif', 'vide');
+      els.motif.removeAttribute('data-anim');
+      if (els.motifVide) els.motifVide.hidden = false;
+      /* <svg> n'implémente pas l'attribut IDL « hidden » : on manipule l'attribut. */
+      if (els.motifScene) els.motifScene.setAttribute('hidden', '');
+      return;
+    }
+
+    var cat = CATEGORIES[categorie];
+    els.motifUse.setAttribute('href', '#' + cat.scene);
+    els.motifVide.hidden = true;
+    els.motifScene.removeAttribute('hidden');
+    els.motif.setAttribute('data-motif', 'plein');
+    els.motif.setAttribute('data-anim', 'entree');
+    minuteries.motif = window.setTimeout(function () {
+      els.motif.removeAttribute('data-anim');
+    }, 520);
+  }
+
+  function majEtiquette(contexte) {
+    if (!els.etiquette) return;
+    if (contexte) {
+      els.etiquette.setAttribute('data-etat', 'pose');
+      els.etiquetteTexte.textContent = CONTEXTES[contexte];
+      els.etiquettePicto.setAttribute('href', '#g-' + contexte);
     } else {
-      actions.append(button("← Historique", "secondary", showHistory), button("Analyser un autre fight ↗", "primary", newAnalysis));
+      els.etiquette.setAttribute('data-etat', 'vide');
+      els.etiquetteTexte.textContent = 'Contexte à préciser';
+      els.etiquettePicto.setAttribute('href', '#g-maison');
     }
-    workspace.append(actions);
-    if (!saved) addDraftStatus();
-    else workspace.append(node("p", "save-state", storageOK ? "Historique local : pas de synchronisation entre appareils." : "Cette session n’a pas de sauvegarde persistante disponible."));
   }
-  function dateLabel(value) { return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
-  function recordTitle(record) { return record.title.trim() || `Fight du ${dateLabel(record.createdAt)}`; }
-  function exportHistory() {
-    const content = JSON.stringify({ application: "ANGLE", version: 1, exportedAt: new Date().toISOString(), analyses: records, brouillon: draft }, null, 2);
-    const blob = new Blob([content], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob), link = document.createElement("a");
-    link.href = url; link.download = `angle-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1500);
-    toast("Export lancé. Cette V1 n’intègre pas encore de réimportation.");
+
+  function majCarte() {
+    if (!carte) return;
+    var f = filtresAtelier();
+    var complet = filtresComplets(f);
+
+    if (f.duree) carte.setAttribute('data-duree', String(f.duree));
+    else carte.removeAttribute('data-duree');
+
+    if (els.tempsValeur) els.tempsValeur.textContent = f.duree ? String(f.duree) : '—';
+    if (els.tempsUnite) els.tempsUnite.textContent = f.duree ? 'minutes' : 'temps à choisir';
+
+    majMotif(f.categorie);
+    majEtiquette(f.contexte);
+
+    carte.setAttribute('data-complet', complet ? 'oui' : 'non');
+    btnOuvrir.setAttribute('aria-disabled', complet ? 'false' : 'true');
+
+    if (els.invitation) {
+      els.invitation.hidden = false;
+      els.invitation.textContent = complet
+        ? 'Tout est prêt. La carte n’attend plus que toi.'
+        : 'La carte attend tes trois choix.';
+    }
+
+    if (els.aideEnvie) {
+      els.aideEnvie.textContent = f.categorie === 'bouger'
+        ? 'Les propositions « bouger » ont toujours une version assise ou immobile.'
+        : '';
+      els.aideEnvie.hidden = !els.aideEnvie.textContent;
+    }
   }
-  function deleteRecord(id) {
-    if (!window.confirm("Supprimer définitivement cette analyse de cet historique ?")) return;
-    records = records.filter((record) => record.id !== id);
-    const persisted = writeStorage(KEYS.history, records); showHistory();
-    toast(persisted ? "Analyse supprimée de l’historique local." : "Analyse retirée de cet onglet. Suppression persistante non garantie.");
+
+  function melanger(liste) {
+    var copie = liste.slice();
+    for (var i = copie.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = copie[i];
+      copie[i] = copie[j];
+      copie[j] = t;
+    }
+    return copie;
   }
-  function showHistory() {
-    showBase("Garde une trace. Pas une note.", "MÉMOIRE LOCALE", "Relis ce que tu savais, ce que tu cherchais et ce que tu as conclu. Aucun score de décision n’est calculé.", true);
-    workspace.append(makeNotice("Les analyses sont conservées sur ce navigateur quand le stockage est disponible. Un nettoyage des données peut les supprimer. En navigation privée, elles peuvent disparaître à la fermeture. Aucun thème récurrent n’est diagnostiqué dans cette première version."));
-    const toolbar = node("div", "actions"), left = node("div", "actions-group"), right = node("div", "actions-group");
-    left.append(button("Nouvelle analyse ↗", "primary", newAnalysis));
-    if (draft) left.append(button("Reprendre le brouillon", "secondary", resumeDraft));
-    right.append(button("Exporter mes données", "secondary", exportHistory));
-    if (records.length) right.append(button("Tout supprimer", "danger", () => {
-      if (!window.confirm("Supprimer toutes les analyses de cet historique ? Le brouillon sera conservé.")) return;
-      records = []; const persisted = writeStorage(KEYS.history, records); showHistory();
-      toast(persisted ? "Historique supprimé." : "Historique retiré de cet onglet. Suppression persistante non garantie.");
+
+  function choisirDans(liste) {
+    var melange = melanger(liste);
+    if (melange.length > 1 && melange[0].id === etat.defiCourantId) return melange[1];
+    return melange[0];
+  }
+
+  function rendreDefi(defi) {
+    if (!defi) return;
+    etat.defiCourantId = defi.id;
+
+    els.defi.hidden = false;
+    els.vide.hidden = true;
+
+    els.defiCategorie.textContent = CATEGORIES[defi.categorie].nom;
+    els.defiDuree.textContent = defi.duree + ' minutes';
+
+    var contexteChoisi = filtresAtelier().contexte;
+    var contextesAffiches = contexteChoisi && defi.contextes.indexOf(contexteChoisi) !== -1
+      ? [CONTEXTES[contexteChoisi]]
+      : defi.contextes.slice(0, 2).map(function (c) { return CONTEXTES[c]; });
+    els.defiContexte.textContent = contextesAffiches.join(' · ');
+
+    els.defiTitre.textContent = defi.titre;
+    els.defiConsigne.textContent = defi.consigne;
+
+    els.defiEtapes.replaceChildren.apply(els.defiEtapes, defi.etapes.map(function (etape) {
+      return el('li', null, etape);
     }));
-    toolbar.append(left, right); workspace.append(toolbar);
-    const list = node("div", "history-list");
-    if (!records.length) {
-      const empty = node("div", "panel empty-state");
-      empty.append(node("h2", "", "Aucune analyse pour l’instant."), node("p", "", "Ton premier débrief commence par une décision, pas par une note.")); list.append(empty);
-    }
-    for (const record of records) {
-      const card = node("article", "panel history-card"), info = node("div"), controls = node("div", "actions-group");
-      info.append(node("span", "chip", OUTCOMES[record.setup.outcome]), node("h2", "", recordTitle(record)), node("p", "", `${dateLabel(record.createdAt)} · ${MODES[record.setup.mode]} · ${TEAMS[record.setup.team]}`));
-      controls.append(button("Relire", "secondary small", () => showSummary(record, true)), button("Supprimer", "danger small", () => deleteRecord(record.id)));
-      card.append(info, controls); list.append(card);
-    }
-    workspace.append(list); updateCounters();
-  }
 
-  // COUCHE VISUELLE : aucun accès aux réponses, aucun calcul de verdict.
-  function createEffects() {
-    // Ajouter ici uniquement TES ressources autorisées. Chaînes vides = aucun téléchargement.
-    // Exemple d'usage après ajout réel d'un fichier : hero: "./ma-video.mp4"
-    // Préférer un court MP4/WebM sombre et muet. Le site n'en dépend jamais.
-    const VIDEO_SOURCES = { hero: "", passage: "" };
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const fine = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const connection = navigator.connection;
-    let paused = false, atHome = !home.hidden, frame = 0;
-    let pointer = null;
-    const visibleScenes = new Set(), animated = new Set(), splitTargets = [], videoStates = [];
-    const toggle = $("#motion-toggle");
-    const allowed = () => !paused && !reduced.matches && !document.hidden;
-    const descriptions = {
-      engage: "Engager : quel bénéfice attendais-tu, pour quel risque et pour quel objectif ?",
-      rotate: "Changer de chemin : qu’aurais-tu conservé, gagné ou abandonné en prenant une autre route ?",
-      observe: "Observer : quelle information supplémentaire aurait pu modifier ton choix ? Quel coût avait l’attente ?"
-    };
-    function animate(element, keyframes, options) {
-      if (!allowed() || !element.animate) return;
-      const animation = element.animate(keyframes, options);
-      animated.add(animation);
-      animation.onfinish = () => animated.delete(animation);
-      animation.oncancel = () => animated.delete(animation);
+    var materielBrut = (defi.materiel && defi.materiel.length) ? defi.materiel : ['rien'];
+    var materiel = materielBrut.length === 1 && materielBrut[0] === 'rien'
+      ? ['aucun matériel nécessaire']
+      : materielBrut;
+    els.defiMateriel.replaceChildren.apply(els.defiMateriel, materiel.map(function (m) {
+      return el('li', null, m);
+    }));
+
+    els.defiVariante.textContent = defi.variante;
+    els.defiQuestion.textContent = defi.question || 'Pas de question pour cette idée : la trace peut rester dans ta tête.';
+
+    var i = indexDefi(defi.id);
+    if (els.numero) {
+      els.numero.hidden = false;
+      els.numero.textContent = 'idée ' + String(i + 1).padStart(2, '0') + ' / ' + BIBLIO.length;
     }
-    function syncMotion() {
-      document.body.classList.toggle("effects-paused", !allowed());
-      const stopped = paused || reduced.matches;
-      toggle.setAttribute("aria-pressed", String(stopped));
-      toggle.textContent = reduced.matches ? "Mouvements réduits (système)" : paused ? "Mouvements : en pause" : "Mouvements : actifs";
-      toggle.disabled = reduced.matches;
-      if (!allowed()) {
-        splitTargets.forEach(({ words }) => words.forEach((word) => { word.style.opacity = "1"; }));
-        animated.forEach((animation) => animation.cancel()); animated.clear();
-        document.documentElement.style.setProperty("--terrain-x", "0px");
-        document.documentElement.style.setProperty("--terrain-y", "0px");
-        document.documentElement.style.setProperty("--map-rx", "0deg");
-        document.documentElement.style.setProperty("--map-ry", "0deg");
-      }
-      videoStates.forEach(syncVideo);
-      schedule();
-    }
-    function splitHeading(element) {
-      // On découpe seulement les nœuds texte, en conservant <br>, <em> et les espaces.
-      // Pas de duplication aria-hidden : le vrai texte reste sélectionnable et lisible.
-      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-      const texts = [];
-      while (walker.nextNode()) texts.push(walker.currentNode);
-      const words = [];
-      texts.forEach((textNode) => {
-        const fragment = document.createDocumentFragment();
-        textNode.textContent.split(/(\s+)/).forEach((part) => {
-          if (!part) return;
-          if (/^\s+$/.test(part)) fragment.append(document.createTextNode(part));
-          else {
-            const mask = node("span", "word-mask"), word = node("span", "reveal-word", part);
-            mask.append(word); fragment.append(mask); words.push(word);
-          }
-        });
-        textNode.replaceWith(fragment);
-      });
-      splitTargets.push({ element, words });
-    }
-    function reveal(element) {
-      const words = $$(".reveal-word", element);
-      if (words.length) words.forEach((word, i) => animate(word,
-        [{ transform: "translateY(108%)", opacity: .25 }, { transform: "translateY(0)", opacity: 1 }],
-        { duration: 850, delay: Math.min(i * 55, 500), easing: "cubic-bezier(.22,1,.36,1)", fill: "backwards" }
-      ));
-      else animate(element, [{ opacity: .3, transform: "translateY(22px)" }, { opacity: 1, transform: "translateY(0)" }],
-        { duration: 800, easing: "cubic-bezier(.22,1,.36,1)" });
-    }
-    function draw() {
-      frame = 0;
-      if (!atHome || !allowed()) return;
-      // Luminosité liée au scroll : seuil bas lisible, aucune saisie bloquée.
-      splitTargets.forEach(({ element, words }) => {
-        const rect = element.getBoundingClientRect();
-        if (rect.bottom < 0 || rect.top > innerHeight) return;
-        const progress = Math.max(0, Math.min(1, (innerHeight * .94 - rect.top) / (innerHeight * .68)));
-        words.forEach((word, i) => {
-          const local = Math.max(0, Math.min(1, progress * (words.length + 2) - i));
-          word.style.opacity = String(.48 + .52 * local);
-        });
-      });
-      if (pointer && fine.matches) {
-        document.documentElement.style.setProperty("--mx", `${pointer.x}px`);
-        document.documentElement.style.setProperty("--my", `${pointer.y}px`);
-        document.documentElement.style.setProperty("--terrain-x", `${(pointer.x / innerWidth - .5) * 18}px`);
-        document.documentElement.style.setProperty("--terrain-y", `${(pointer.y / innerHeight - .5) * 12}px`);
-        if (visibleScenes.has($("#champ"))) {
-          const rect = $(".map-depth").getBoundingClientRect();
-          const x = Math.max(-.5, Math.min(.5, (pointer.x - rect.left) / rect.width - .5));
-          const y = Math.max(-.5, Math.min(.5, (pointer.y - rect.top) / rect.height - .5));
-          document.documentElement.style.setProperty("--map-rx", `${-y * 3}deg`);
-          document.documentElement.style.setProperty("--map-ry", `${x * 4}deg`);
-        }
-      }
-    }
-    function schedule() { if (!frame) frame = requestAnimationFrame(draw); }
-    function stopVideo(state) {
-      state.video.pause(); state.video.classList.remove("is-ready");
-    }
-    function syncVideo(state) {
-      const canPlay = atHome && allowed() && state.inView && !state.failed && !connection?.saveData;
-      if (!canPlay || !state.url) { stopVideo(state); return; }
-      if (state.pending) return;
-      if (!state.loaded) {
-        state.loaded = true;
-        try {
-          const parsed = new URL(state.url, document.baseURI);
-          if (!["http:", "https:", "file:"].includes(parsed.protocol)) throw new Error("Protocole vidéo non pris en charge");
-          state.video.src = parsed.href;
-          state.video.load();
-          state.timer = setTimeout(() => {
-            if (state.video.readyState < 2) { state.failed = true; stopVideo(state); }
-          }, 9000);
-        } catch { state.failed = true; stopVideo(state); return; }
-      }
-      state.pending = true;
-      const promise = state.video.play();
-      if (promise?.then) promise.then(() => {
-        state.pending = false;
-        if (!(atHome && allowed() && state.inView)) stopVideo(state);
-      }).catch(() => { state.pending = false; state.failed = true; stopVideo(state); });
-      else state.pending = false;
-    }
-    function initVideos() {
-      for (const [id, url] of Object.entries(VIDEO_SOURCES)) {
-        const video = $(`#${id}-video`);
-        const state = { video, url: url.trim(), loaded: false, pending: false, failed: false, inView: false, timer: 0 };
-        video.muted = true;
-        video.addEventListener("playing", () => {
-          clearTimeout(state.timer);
-          if (atHome && allowed() && state.inView && !state.failed) video.classList.add("is-ready");
-          else stopVideo(state);
-        });
-        video.addEventListener("error", () => { clearTimeout(state.timer); state.failed = true; stopVideo(state); });
-        videoStates.push(state);
-      }
-      if (!("IntersectionObserver" in window)) return;
-      const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
-        const state = videoStates.find((item) => item.video === entry.target);
-        state.inView = entry.isIntersecting; syncVideo(state);
-      }), { threshold: .05 });
-      videoStates.forEach((state) => observer.observe(state.video));
-    }
-    function init() {
-      $$("[data-split]").forEach(splitHeading);
-      toggle.hidden = false;
-      toggle.addEventListener("click", () => { paused = !paused; syncMotion(); });
-      if ("IntersectionObserver" in window) {
-        const reveals = new IntersectionObserver((entries, observer) => entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          reveal(entry.target); observer.unobserve(entry.target);
-        }), { threshold: .12 });
-        $$("[data-split], [data-reveal]").forEach((element) => reveals.observe(element));
-        const scenes = new IntersectionObserver((entries) => entries.forEach((entry) => {
-          entry.target.classList.toggle("is-visible", entry.isIntersecting && atHome);
-          if (entry.isIntersecting) visibleScenes.add(entry.target); else visibleScenes.delete(entry.target);
-        }), { threshold: 0 });
-        $$(".scene").forEach((element) => scenes.observe(element));
-      }
-      $$("[data-route]").forEach((control) => {
-        control.disabled = false;
-        control.addEventListener("click", () => {
-          const route = control.dataset.route;
-          $$("[data-route]").forEach((other) => {
-            const selected = other === control;
-            other.classList.toggle("is-active", selected); other.setAttribute("aria-pressed", String(selected));
-          });
-          $$("[data-map-route]").forEach((element) => element.classList.toggle("is-active", element.dataset.mapRoute === route));
-          $("#route-description").textContent = descriptions[route];
-          animate($("#route-description"), [{ opacity: .4, transform: "translateY(5px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 300 });
-        });
-      });
-      window.addEventListener("scroll", schedule, { passive: true });
-      window.addEventListener("resize", schedule, { passive: true });
-      document.addEventListener("pointermove", (event) => {
-        if (!atHome || !allowed() || !fine.matches) return;
-        pointer = { x: event.clientX, y: event.clientY }; schedule();
-      }, { passive: true });
-      document.documentElement.addEventListener("pointerleave", () => { pointer = null; });
-      document.addEventListener("visibilitychange", syncMotion);
-      if (reduced.addEventListener) reduced.addEventListener("change", syncMotion);
-      else reduced.addListener(syncMotion);
-      connection?.addEventListener?.("change", syncMotion);
-      initVideos(); syncMotion();
-    }
-    return {
-      init,
-      setHome(value) {
-        atHome = value;
-        $$(".scene").forEach((scene) => scene.classList.toggle("is-visible", value && visibleScenes.has(scene)));
-        if (!value) {
-          animated.forEach((animation) => animation.cancel()); animated.clear();
-        }
-        videoStates.forEach(syncVideo); schedule();
-      },
-      enterWorkspace(root) {
-        // Ni temporisation de navigation ni overlay bloquant : le formulaire existe déjà.
-        Array.from(root.children).slice(0, 8).forEach((element, i) => {
-          animate(element, [{ opacity: .35, transform: "translateY(12px)" }, { opacity: 1, transform: "translateY(0)" }],
-            { duration: 380, delay: i * 22, easing: "cubic-bezier(.22,1,.36,1)", fill: "backwards" });
-        });
-      },
-      select(element) { animate(element, [{ transform: "translateX(0)" }, { transform: "translateX(3px)" }, { transform: "translateX(0)" }], { duration: 240 }); }
+
+    majBoutonFavori();
+    majPiedNote('');
+
+    etat.modele.atelier = {
+      duree: filtresAtelier().duree,
+      categorie: filtresAtelier().categorie,
+      contexte: filtresAtelier().contexte,
+      defiId: defi.id,
+      ouverte: carte.getAttribute('data-etat') === 'ouverte'
     };
   }
 
-  function initialize() {
-    try { const probe = "angle.v1.storage-test"; localStorage.setItem(probe, "1"); localStorage.removeItem(probe); }
-    catch { storageFailure(); }
-    records = readStorage(KEYS.history, [], (value) => Array.isArray(value) && value.every(validRecord)).map(normalizeRecord);
-    const rawDraft = readStorage(KEYS.draft, null, (value) => value === null || validRecord(value));
-    draft = rawDraft ? normalizeRecord(rawDraft) : null;
-    $$("#start-button, [data-start]").forEach((control) => { control.disabled = false; control.addEventListener("click", newAnalysis); });
-    $("#resume-button").addEventListener("click", resumeDraft);
-    $$('a[href="#accueil"]').forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); showHome(); }));
-    $('[data-nav="history"]').addEventListener("click", (event) => { event.preventDefault(); showHistory(); });
-    // Ne plus recharger brutalement un formulaire quand un autre onglet écrit.
-    window.addEventListener("storage", (event) => {
-      if (![KEYS.history, KEYS.draft, null].includes(event.key)) return;
-      storageFailure("Les données ont changé dans un autre onglet. Pour éviter un écrasement, les écritures sont suspendues ici. Exporte ton travail puis recharge cette page pour retrouver les données du navigateur.");
+  function suggestionsAtelier(f) {
+    var suggestions = [];
+
+    if (f.contexte) {
+      var sansContexte = { duree: f.duree, categorie: f.categorie, contexte: null };
+      var n1 = defisCorrespondants(sansContexte).length;
+      if (n1 > 0) suggestions.push({
+        texte: 'Ouvrir le contexte (' + n1 + ' idée' + (n1 > 1 ? 's' : '') + ')',
+        action: function () { appliquerFiltresAtelier(sansContexte); }
+      });
+    }
+
+    DUREES.forEach(function (d) {
+      if (d === f.duree) return;
+      var essai = { duree: d, categorie: f.categorie, contexte: f.contexte };
+      var n = defisCorrespondants(essai).length;
+      if (n > 0) suggestions.push({
+        texte: 'Essayer ' + d + ' minutes (' + n + ')',
+        action: function () { appliquerFiltresAtelier(essai); }
+      });
     });
-    updateCounters();
-    try { effects = createEffects(); effects.init(); }
-    catch (error) { console.warn("ANGLE : effets visuels désactivés, parcours conservé.", error); effects = null; }
-    if (window.location.hash === "#historique") showHistory();
+
+    suggestions.push({
+      texte: 'Chercher dans toute la bibliothèque',
+      action: function () {
+        var params = new URLSearchParams();
+        if (f.duree) params.set('duree', String(f.duree));
+        if (f.contexte) params.set('contexte', f.contexte);
+        window.location.hash = '#/explorer' + (params.toString() ? '?' + params.toString() : '');
+      }
+    });
+
+    return suggestions.slice(0, 4);
   }
-  initialize();
+
+  function rendreVideAtelier(f) {
+    els.defi.hidden = true;
+    els.vide.hidden = false;
+    etat.defiCourantId = null;
+
+    var morceaux = descriptionsFiltres(f);
+    els.videTitre.textContent = 'Aucune idée ne réunit ces trois choix';
+    els.videTexte.textContent = 'Rien ne correspond à « ' + morceaux.join(' · ') + ' ». Aucun filtre n’a été changé à ta place : tu peux élargir toi-même.';
+
+    var boutons = suggestionsAtelier(f).map(function (s) {
+      var b = el('button', 'bouton bouton--fantome', s.texte);
+      b.type = 'button';
+      b.addEventListener('click', s.action);
+      return b;
+    });
+
+    var tout = el('a', 'bouton bouton--secondaire', 'Voir toutes les idées');
+    tout.href = '#/explorer';
+    boutons.push(tout);
+
+    els.videActions.replaceChildren.apply(els.videActions, boutons);
+    if (els.numero) els.numero.hidden = true;
+    majPiedNote('');
+  }
+
+  function appliquerFiltresAtelier(nouveau) {
+    reglerRadios(nouveau);
+    majCarte();
+    if (carte.getAttribute('data-etat') === 'ouverte') {
+      ouvrirCarte({ focusTitre: true });
+    } else {
+      annoncer('Réglages appliqués. La carte est prête à s’ouvrir.');
+    }
+    etat.modele.atelier = {
+      duree: nouveau.duree, categorie: nouveau.categorie, contexte: nouveau.contexte,
+      defiId: etat.defiCourantId, ouverte: carte.getAttribute('data-etat') === 'ouverte'
+    };
+    sauvegarder();
+  }
+
+  function majBoutonOuvrir(ouverte) {
+    if (els.ouvrirTexte) els.ouvrirTexte.textContent = ouverte ? 'Refermer la carte' : 'Ouvrir mon déclic';
+    btnOuvrir.setAttribute('aria-expanded', ouverte ? 'true' : 'false');
+    carte.classList.toggle('est-ouverte', ouverte);
+  }
+
+  function ouvrirCarte(options) {
+    options = options || {};
+    var f = filtresAtelier();
+
+    if (!filtresComplets(f)) {
+      guiderVersManquant(f);
+      return;
+    }
+
+    var liste = defisCorrespondants(f);
+    if (!liste.length) {
+      rendreVideAtelier(f);
+    } else {
+      /* On reprend l'idée déjà choisie si elle colle toujours aux réglages :
+         refermer la carte ne doit pas faire perdre la proposition en cours. */
+      var candidat = options.defiId || (etat.modele.atelier && etat.modele.atelier.defiId);
+      var defi = candidat ? trouverDefi(candidat) : null;
+      if (!defi || !correspondre(defi, f)) defi = choisirDans(liste);
+      rendreDefi(defi);
+    }
+
+    carte.setAttribute('data-etat', 'ouverte');
+    majBoutonOuvrir(true);
+    depliage.inert = false;
+    depliage.removeAttribute('aria-hidden');
+    els.actions.hidden = false;
+
+    etat.modele.atelier = {
+      duree: f.duree, categorie: f.categorie, contexte: f.contexte,
+      defiId: etat.defiCourantId, ouverte: true
+    };
+    sauvegarder();
+
+    if (options.focusTitre) {
+      var cible = liste.length ? els.defiTitre : els.videTitre;
+      try { cible.focus({ preventScroll: true }); } catch (e) { cible.focus(); }
+      var zone = carte.getBoundingClientRect();
+      if (zone.top < 60 || zone.bottom > window.innerHeight + 40) defilementDoux(carte);
+    }
+
+    if (etat.defiCourantId) {
+      var d = trouverDefi(etat.defiCourantId);
+      annoncer('Carte ouverte. ' + (d ? d.titre + ', ' + d.duree + ' minutes.' : 'Aucune idée ne correspond à ces choix.'));
+    } else {
+      annoncer('Aucune idée ne réunit ces trois choix. Des solutions d’élargissement sont proposées.');
+    }
+  }
+
+  function fermerCarte(options) {
+    options = options || {};
+    carte.setAttribute('data-etat', 'fermee');
+    majBoutonOuvrir(false);
+    els.actions.hidden = true;
+    depliage.inert = true;
+    depliage.setAttribute('aria-hidden', 'true');
+
+    etat.modele.atelier.ouverte = false;
+    etat.modele.atelier.defiId = etat.defiCourantId;
+    sauvegarder();
+
+    if (options.message) annoncer(options.message);
+    if (options.focusBouton && btnOuvrir) {
+      try { btnOuvrir.focus({ preventScroll: true }); } catch (e) { btnOuvrir.focus(); }
+    }
+  }
+
+  function guiderVersManquant(f) {
+    var manque = null;
+    var nom = '';
+    if (!f.duree) { manque = '#groupe-duree input'; nom = 'une durée'; }
+    else if (!f.categorie) { manque = '#groupe-envie input'; nom = 'une envie'; }
+    else if (!f.contexte) { manque = '#groupe-contexte input'; nom = 'un contexte'; }
+
+    var cible = manque ? $(manque) : null;
+    if (cible) {
+      try { cible.focus({ preventScroll: true }); } catch (e) { cible.focus(); }
+      if (cible.getBoundingClientRect().top < 0) defilementDoux(cible.closest('fieldset'));
+    }
+    annoncer('Il manque ' + nom + ' pour ouvrir la carte.');
+    if (els.invitation) els.invitation.textContent = 'Il manque ' + nom + ' : la carte s’ouvrira juste après.';
+  }
+
+  function majBoutonFavori() {
+    if (!els.btnFavori) return;
+    var id = etat.defiCourantId;
+    var fav = id ? estFavori(id) : false;
+    els.btnFavori.setAttribute('aria-pressed', fav ? 'true' : 'false');
+    els.btnFavori.disabled = !id;
+    if (els.favoriTexte) els.favoriTexte.textContent = fav ? 'Dans tes favoris' : 'Garder en favori';
+    carte.classList.toggle('est-favori', fav);
+  }
+
+  function majPiedNote(message, lien, avecTampon) {
+    if (els.tampon) {
+      els.tampon.hidden = !avecTampon;
+      if (!avecTampon) els.tampon.classList.remove('est-actif');
+    }
+    if (!els.piedNote) return;
+    if (!message) {
+      els.piedNote.replaceChildren();
+      return;
+    }
+    var fragment = document.createDocumentFragment();
+    fragment.appendChild(document.createTextNode(message + ' '));
+    if (lien) {
+      var a = el('a', null, lien.texte);
+      a.href = lien.href;
+      a.style.textDecoration = 'underline';
+      a.style.textUnderlineOffset = '3px';
+      fragment.appendChild(a);
+    }
+    els.piedNote.replaceChildren(fragment);
+  }
+
+  function lancerTampon(texte) {
+    if (!els.tampon) return;
+    window.clearTimeout(minuteries.tampon);
+    if (els.tamponTexte) els.tamponTexte.textContent = texte || 'Noté';
+    els.tampon.hidden = false;
+    els.tampon.classList.remove('est-actif');
+    void els.tampon.offsetWidth;
+    els.tampon.classList.add('est-actif');
+  }
+
+  var dernierEnregistrement = 0;
+
+  function enregistrerAuCarnet() {
+    var id = etat.defiCourantId;
+    if (!id) return;
+    if (Date.now() - dernierEnregistrement < 900) return; /* double clic accidentel */
+    dernierEnregistrement = Date.now();
+    var defi = trouverDefi(id);
+    if (!defi) return;
+
+    var maintenant = horodatage();
+    var page = {
+      id: identifiantUnique(),
+      defiId: id,
+      statut: 'essaye',
+      note: '',
+      cree: maintenant,
+      maj: maintenant
+    };
+    etat.modele.carnet.push(page);
+    var garde = sauvegarder();
+
+    lancerTampon('Noté');
+    majPastilles();
+    majPiedNote(
+      garde
+        ? 'Ajouté à ton carnet.'
+        : 'Ajouté pour cette session seulement : le stockage local n’a pas répondu.',
+      { texte: 'Ouvrir le carnet', href: '#/carnet' },
+      true
+    );
+    annoncer('« ' + defi.titre + ' » ajouté à ton carnet, statut essayé.');
+    if (window.location.hash === '#/carnet') rendreCarnet();
+
+    /* Confirmation visuelle du bouton : on ne le désactive pas (le grisé se lit mal
+       et laisserait croire à une panne), on marque simplement l'ajout. */
+    var texteInitial = els.btnEnregistrer.getAttribute('data-texte-initial') || els.btnEnregistrer.textContent;
+    els.btnEnregistrer.setAttribute('data-texte-initial', texteInitial);
+    els.btnEnregistrer.textContent = 'Ajouté à ton carnet';
+    els.btnEnregistrer.classList.add('est-confirme');
+    window.clearTimeout(minuteries.enregistrer);
+    minuteries.enregistrer = window.setTimeout(function () {
+      els.btnEnregistrer.textContent = texteInitial;
+      els.btnEnregistrer.classList.remove('est-confirme');
+    }, 1800);
+  }
+
+  if (formulaireAtelier) {
+    formulaireAtelier.addEventListener('change', function (evt) {
+      if (!evt.target || evt.target.type !== 'radio') return;
+      var etaitOuverte = carte.getAttribute('data-etat') === 'ouverte';
+      majCarte();
+      etat.modele.atelier = {
+        duree: filtresAtelier().duree,
+        categorie: filtresAtelier().categorie,
+        contexte: filtresAtelier().contexte,
+        defiId: etat.defiCourantId,
+        ouverte: false
+      };
+      sauvegarder();
+      if (etaitOuverte) {
+        fermerCarte({ message: 'La carte se referme : tes nouveaux réglages sont pris en compte.' });
+      }
+    });
+  }
+
+  if (btnOuvrir) {
+    btnOuvrir.addEventListener('click', function () {
+      if (carte.getAttribute('data-etat') === 'ouverte') {
+        fermerCarte({ message: 'Carte refermée. Ton défi reste noté, tu peux le retrouver en rechargeant la page.', focusBouton: true });
+      } else {
+        ouvrirCarte({ focusTitre: true });
+      }
+    });
+  }
+
+  if (els.btnAutre) {
+    els.btnAutre.addEventListener('click', function () {
+      var f = filtresAtelier();
+      var liste = defisCorrespondants(f).filter(function (d) { return d.id !== etat.defiCourantId; });
+      if (!liste.length) {
+        var seule = defisCorrespondants(f);
+        majPiedNote(seule.length
+          ? 'C’est la seule idée pour ces réglages. Élargis un choix pour en voir d’autres.'
+          : 'Plus aucune idée pour ces réglages.');
+        annoncer('Aucune autre idée pour ces réglages. Tu peux élargir un filtre.');
+        return;
+      }
+      var defi = choisirDans(liste);
+      rendreDefi(defi);
+      els.defi.classList.remove('est-nouveau');
+      void els.defi.offsetWidth;
+      els.defi.classList.add('est-nouveau');
+      annoncer('Nouvelle idée : ' + defi.titre + '.');
+    });
+  }
+
+  if (els.btnFavori) {
+    els.btnFavori.addEventListener('click', function () {
+      var id = etat.defiCourantId;
+      if (!id) return;
+      var ajoute = faireBasculerFavori(id);
+      majBoutonFavori();
+      majPiedNote(ajoute ? 'Gardé dans tes favoris.' : 'Retiré de tes favoris.', { texte: 'Voir mes favoris', href: '#/favoris' });
+      annoncer(ajoute ? 'Idée gardée en favori.' : 'Idée retirée des favoris.');
+      if (window.location.hash.indexOf('#/favoris') === 0) rendreFavoris();
+    });
+  }
+
+  if (els.btnEnregistrer) {
+    els.btnEnregistrer.addEventListener('click', enregistrerAuCarnet);
+  }
+
+  /* ------------------------------------------------------------------ 09. Explorer */
+
+  var explorer = {
+    grille: $('[data-grille-defis]'),
+    vide: $('[data-explorer-vide]'),
+    entete: $('[data-resultats-entete]'),
+    recherche: $('#recherche'),
+    categorie: $('#filtre-categorie'),
+    duree: $('#filtre-duree'),
+    contexte: $('#filtre-contexte'),
+    reset: $('#filtres-reset'),
+    videTitre: $('[data-vide-explorer-titre]'),
+    videTexte: $('[data-vide-explorer-texte]'),
+    videActions: $('[data-vide-explorer-actions]')
+  };
+
+  function filtresExplorer() {
+    return {
+      categorie: explorer.categorie && explorer.categorie.value ? explorer.categorie.value : null,
+      duree: explorer.duree && explorer.duree.value ? Number(explorer.duree.value) : null,
+      contexte: explorer.contexte && explorer.contexte.value ? explorer.contexte.value : null
+    };
+  }
+
+  function appliquerParamsExplorer(params) {
+    if (!explorer.categorie) return;
+    var cat = params.get('categorie');
+    var duree = params.get('duree');
+    var contexte = params.get('contexte');
+    var recherche = params.get('q');
+
+    explorer.categorie.value = cat && CATEGORIES[cat] ? cat : '';
+    explorer.duree.value = duree && DUREES.indexOf(Number(duree)) !== -1 ? String(Number(duree)) : '';
+    explorer.contexte.value = contexte && CONTEXTES[contexte] ? contexte : '';
+    if (explorer.recherche) explorer.recherche.value = recherche ? recherche.slice(0, 80) : '';
+  }
+
+  function ecrireParamsExplorer() {
+    var f = filtresExplorer();
+    var params = new URLSearchParams();
+    if (f.categorie) params.set('categorie', f.categorie);
+    if (f.duree) params.set('duree', String(f.duree));
+    if (f.contexte) params.set('contexte', f.contexte);
+    if (explorer.recherche && explorer.recherche.value.trim()) params.set('q', explorer.recherche.value.trim().slice(0, 80));
+    var nouveau = '#/explorer' + (params.toString() ? '?' + params.toString() : '');
+    if (window.location.hash !== nouveau) {
+      try { window.history.replaceState(null, '', nouveau); } catch (e) { /* file:// : on laisse le hash tel quel */ }
+    }
+  }
+
+  function suggestionsExplorer(f, recherche) {
+    var suggestions = [];
+    var essais = [];
+
+    if (recherche) {
+      essais.push({
+        texte: 'Effacer la recherche',
+        faire: function () { explorer.recherche.value = ''; rendreExplorer(); }
+      });
+    }
+    if (f.contexte) {
+      essais.push({
+        texte: 'Retirer le contexte',
+        faire: function () { explorer.contexte.value = ''; rendreExplorer(); }
+      });
+    }
+    if (f.duree) {
+      essais.push({
+        texte: 'Retirer la durée',
+        faire: function () { explorer.duree.value = ''; rendreExplorer(); }
+      });
+    }
+    if (f.categorie) {
+      essais.push({
+        texte: 'Retirer l’envie',
+        faire: function () { explorer.categorie.value = ''; rendreExplorer(); }
+      });
+    }
+
+    essais.forEach(function (e) {
+      var copie = Object.assign({}, f);
+      if (e.texte === 'Retirer le contexte') copie.contexte = null;
+      if (e.texte === 'Retirer la durée') copie.duree = null;
+      if (e.texte === 'Retirer l’envie') copie.categorie = null;
+      var n = (e.texte === 'Effacer la recherche')
+        ? BIBLIO.filter(function (d) { return correspondre(d, f); }).length
+        : BIBLIO.filter(function (d) { return correspondre(d, copie) && (!recherche || texteCherchable(d).indexOf(recherche) !== -1); }).length;
+      if (n > 0) suggestions.push({ texte: e.texte + ' (' + n + ')', faire: e.faire });
+    });
+
+    return suggestions.slice(0, 4);
+  }
+
+  function rendreExplorer(options) {
+    options = options || {};
+    if (!explorer.grille) return;
+
+    var f = filtresExplorer();
+    var recherche = normaliser(explorer.recherche ? explorer.recherche.value : '');
+    var liste = BIBLIO.filter(function (d) {
+      return correspondre(d, f) && (!recherche || texteCherchable(d).indexOf(recherche) !== -1);
+    });
+
+    explorer.grille.replaceChildren.apply(explorer.grille, liste.map(creerCarteDefi));
+    explorer.grille.hidden = liste.length === 0;
+
+    var filtresActifs = descriptionsFiltres(f);
+    if (recherche) filtresActifs.push('« ' + (explorer.recherche.value.trim()) + ' »');
+
+    if (explorer.entete) {
+      if (!filtresActifs.length) {
+        explorer.entete.textContent = liste.length + ' idées écrites à la main, toutes durées et tous contextes confondus.';
+      } else {
+        explorer.entete.textContent = liste.length + ' idée' + (liste.length > 1 ? 's' : '') + ' correspond' + (liste.length > 1 ? 'ent' : '') + ' à ' + filtresActifs.join(' · ') + '.';
+      }
+    }
+
+    if (explorer.vide) {
+      explorer.vide.hidden = liste.length !== 0;
+      if (!liste.length) {
+        if (explorer.videTitre) explorer.videTitre.textContent = 'Aucun résultat, et ce n’est pas grave';
+        if (explorer.videTexte) {
+          explorer.videTexte.textContent = filtresActifs.length
+            ? 'Rien ne correspond à ' + filtresActifs.join(' · ') + '. Les filtres restent tels quels : voici comment les élargir, si tu veux.'
+            : 'La bibliothèque est vide : le fichier data/defis.js n’a pas pu être chargé.';
+        }
+        if (explorer.videActions) {
+          var boutons = suggestionsExplorer(f, recherche).map(function (s) {
+            var b = el('button', 'bouton bouton--fantome', s.texte);
+            b.type = 'button';
+            b.addEventListener('click', s.faire);
+            return b;
+          });
+          var tout = el('button', 'bouton bouton--secondaire', 'Tout effacer');
+          tout.type = 'button';
+          tout.addEventListener('click', reinitialiserFiltres);
+          boutons.push(tout);
+          explorer.videActions.replaceChildren.apply(explorer.videActions, boutons);
+        }
+      }
+    }
+
+    if (!options.depuisRoute) ecrireParamsExplorer();
+    if (!options.sansAnnonce) {
+      annoncer(liste.length + ' idée' + (liste.length > 1 ? 's' : '') + ' affichée' + (liste.length > 1 ? 's' : '') + '.');
+    }
+  }
+
+  function reinitialiserFiltres() {
+    if (explorer.recherche) explorer.recherche.value = '';
+    if (explorer.categorie) explorer.categorie.value = '';
+    if (explorer.duree) explorer.duree.value = '';
+    if (explorer.contexte) explorer.contexte.value = '';
+    rendreExplorer();
+  }
+
+  [explorer.recherche, explorer.categorie, explorer.duree, explorer.contexte].forEach(function (champ) {
+    if (!champ) return;
+    var evenement = champ.tagName === 'INPUT' ? 'input' : 'change';
+    champ.addEventListener(evenement, function () { rendreExplorer(); });
+  });
+
+  if (explorer.reset) explorer.reset.addEventListener('click', reinitialiserFiltres);
+
+  /* ------------------------------------------------------------------ 10. Cartes de la bibliothèque */
+
+  function creerCarteDefi(defi) {
+    var li = el('li', 'carte-defi');
+    li.setAttribute('data-defi', defi.id);
+
+    var ruban = el('span', 'carte-defi__ruban');
+    ruban.setAttribute('aria-hidden', 'true');
+    ruban.setAttribute('data-actif', estFavori(defi.id) ? 'oui' : 'non');
+
+    var scene = el('div', 'carte-defi__scene');
+    scene.setAttribute('aria-hidden', 'true');
+    scene.appendChild(icone(CATEGORIES[defi.categorie].scene, 'scene'));
+    var svgScene = scene.querySelector('svg');
+    if (svgScene) svgScene.setAttribute('viewBox', '0 0 240 200');
+
+    var corps = el('div', 'carte-defi__corps');
+
+    var meta = el('p', 'carte-defi__meta');
+    meta.appendChild(el('span', 'etiquette-cat', CATEGORIES[defi.categorie].court));
+    meta.appendChild(el('span', null, defi.duree + ' min'));
+
+    var titre = el('h3', 'carte-defi__titre', defi.titre);
+    var consigne = el('p', 'carte-defi__consigne', defi.consigne);
+
+    var contextes = el('p', 'carte-defi__contextes',
+      defi.contextes.map(function (c) { return CONTEXTES[c]; }).join(' · '));
+
+    var pied = el('div', 'carte-defi__pied');
+
+    var ouvrir = el('a', 'bouton bouton--secondaire carte-defi__ouvrir', 'Ouvrir cette idée');
+    ouvrir.href = '#/defi/' + encodeURIComponent(defi.id);
+
+    var favori = el('button', 'carte-defi__favori');
+    favori.type = 'button';
+    favori.setAttribute('data-action', 'favori');
+    favori.setAttribute('data-id', defi.id);
+    var actif = estFavori(defi.id);
+    favori.setAttribute('aria-pressed', actif ? 'true' : 'false');
+    favori.setAttribute('aria-label', (actif ? 'Retirer des favoris' : 'Garder en favori') + ' : ' + defi.titre);
+    favori.appendChild(svgInterne('<path d="M7 4h10v16l-5-4-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>', 'signet'));
+
+    pied.appendChild(ouvrir);
+    pied.appendChild(favori);
+
+    corps.appendChild(meta);
+    corps.appendChild(titre);
+    corps.appendChild(consigne);
+    corps.appendChild(contextes);
+    corps.appendChild(pied);
+
+    li.appendChild(ruban);
+    li.appendChild(scene);
+    li.appendChild(corps);
+    return li;
+  }
+
+  function gererClicFavori(evt) {
+    var bouton = evt.target.closest('[data-action="favori"]');
+    if (!bouton) return;
+    var id = bouton.getAttribute('data-id');
+    if (!id) return;
+    var ajoute = faireBasculerFavori(id);
+    bouton.setAttribute('aria-pressed', ajoute ? 'true' : 'false');
+    bouton.setAttribute('aria-label', (ajoute ? 'Retirer des favoris' : 'Garder en favori') + ' : ' + (trouverDefi(id) || {}).titre);
+    bouton.classList.remove('est-pose');
+    void bouton.offsetWidth;
+    bouton.classList.add('est-pose');
+
+    var carteDefi = bouton.closest('.carte-defi');
+    if (carteDefi) {
+      var ruban = carteDefi.querySelector('.carte-defi__ruban');
+      if (ruban) ruban.setAttribute('data-actif', ajoute ? 'oui' : 'non');
+    }
+
+    annoncer(ajoute ? 'Idée gardée en favori.' : 'Idée retirée des favoris.');
+
+    if (window.location.hash.indexOf('#/favoris') === 0) rendreFavoris();
+    if (etat.defiCourantId === id) majBoutonFavori();
+  }
+
+  document.addEventListener('click', gererClicFavori);
+
+  /* ------------------------------------------------------------------ 11. Favoris */
+
+  var grilleFavoris = $('[data-grille-favoris]');
+  var favorisVide = $('[data-favoris-vide]');
+
+  function rendreFavoris() {
+    if (!grilleFavoris) return;
+    var liste = etat.modele.favoris.map(trouverDefi).filter(Boolean);
+    grilleFavoris.replaceChildren.apply(grilleFavoris, liste.map(creerCarteDefi));
+    grilleFavoris.hidden = liste.length === 0;
+    if (favorisVide) favorisVide.hidden = liste.length !== 0;
+  }
+
+  /* ------------------------------------------------------------------ 12. Carnet */
+
+  var listeCarnet = $('[data-liste-carnet]');
+  var carnetVide = $('[data-carnet-vide]');
+  var carnetCompte = $('[data-carnet-compte-texte]');
+
+  function compterStatuts() {
+    var compte = { realise: 0, essaye: 0, passe: 0 };
+    etat.modele.carnet.forEach(function (p) { if (compte[p.statut] !== undefined) compte[p.statut]++; });
+    return compte;
+  }
+
+  function majPastilles() {
+    var compteCarnet = etat.modele.carnet.length;
+    var compteFavoris = etat.modele.favoris.length;
+    $$('[data-compte="carnet"]').forEach(function (n) {
+      n.textContent = String(compteCarnet);
+      n.hidden = compteCarnet === 0;
+    });
+    $$('[data-compte="favoris"]').forEach(function (n) {
+      n.textContent = String(compteFavoris);
+      n.hidden = compteFavoris === 0;
+    });
+  }
+
+  function creerPageCarnet(page) {
+    var defi = trouverDefi(page.defiId);
+    var li = el('li', 'page-carnet');
+    li.setAttribute('data-page', page.id);
+
+    var entete = el('div', 'page-carnet__entete');
+    var titre = el('h2', 'page-carnet__titre', defi ? defi.titre : 'Idée retirée de la bibliothèque');
+    var date = el('span', 'page-carnet__date', 'noté le ' + dateLisible(page.cree));
+    entete.appendChild(titre);
+    entete.appendChild(date);
+
+    var meta = el('p', 'page-carnet__meta');
+    if (defi) {
+      meta.appendChild(el('span', 'etiquette-cat', CATEGORIES[defi.categorie].court));
+      meta.appendChild(el('span', null, defi.duree + ' min'));
+    } else {
+      meta.appendChild(el('span', null, 'identifiant : ' + page.defiId));
+    }
+
+    li.appendChild(entete);
+    li.appendChild(meta);
+
+    var question = null;
+    if (defi && defi.question) {
+      question = el('p', 'page-carnet__question', defi.question);
+      question.setAttribute('data-question', page.id);
+      /* La question sert d'amorce : une fois la note écrite, elle s'efface. */
+      if (page.note) question.hidden = true;
+      li.appendChild(question);
+    }
+
+    /* statut */
+    var groupe = el('div', 'statuts');
+    groupe.setAttribute('role', 'group');
+    var idLegende = 'statuts-' + page.id;
+    var legende = el('p', 'statuts__legende', 'Où en es-tu ?');
+    legende.id = idLegende;
+    groupe.setAttribute('aria-labelledby', idLegende);
+    groupe.appendChild(legende);
+
+    Object.keys(STATUTS).forEach(function (cle) {
+      var label = el('label', 'statut');
+      var input = el('input');
+      input.type = 'radio';
+      input.name = 'statut-' + page.id;
+      input.value = cle;
+      input.checked = page.statut === cle;
+      input.setAttribute('data-action', 'statut');
+      var boite = el('span', 'statut__boite', STATUTS[cle]);
+      label.appendChild(input);
+      label.appendChild(boite);
+      groupe.appendChild(label);
+    });
+    li.appendChild(groupe);
+
+    /* note */
+    var zoneNote = el('div', 'page-carnet__note');
+    var idNote = 'note-' + page.id;
+    var labelNote = el('label', null, 'Ta note, si tu veux');
+    labelNote.setAttribute('for', idNote);
+    var textarea = el('textarea');
+    textarea.id = idNote;
+    textarea.value = page.note;
+    textarea.maxLength = 2000;
+    textarea.rows = 2;
+    textarea.placeholder = 'Un mot, une phrase, ce que ça a donné…';
+    textarea.addEventListener('input', function () {
+      textarea.classList.toggle('note-prise', textarea.value.trim().length > 0);
+    });
+    zoneNote.appendChild(labelNote);
+    zoneNote.appendChild(textarea);
+    if (page.note) textarea.classList.add('note-prise');
+    li.appendChild(zoneNote);
+
+    /* actions */
+    var pied = el('div', 'page-carnet__pied');
+
+    var enregistrer = el('button', 'bouton bouton--secondaire', 'Enregistrer la note');
+    enregistrer.type = 'button';
+    enregistrer.setAttribute('data-action', 'note');
+
+    var supprimer = el('button', 'bouton bouton--fantome', 'Supprimer');
+    supprimer.type = 'button';
+    supprimer.setAttribute('data-action', 'supprimer');
+
+    var retour = el('p', 'page-carnet__statut-note');
+    retour.setAttribute('data-retour', page.id);
+    retour.setAttribute('role', 'status');
+
+    if (defi) {
+      var ouvrir = el('a', 'bouton bouton--fantome', 'Ouvrir l’idée');
+      ouvrir.href = '#/defi/' + encodeURIComponent(defi.id);
+      pied.appendChild(ouvrir);
+    }
+    pied.appendChild(enregistrer);
+    pied.appendChild(supprimer);
+    pied.appendChild(retour);
+
+    li.appendChild(pied);
+    return li;
+  }
+
+  function majCompteCarnet(pages) {
+    if (!carnetCompte) return;
+    if (!pages.length) {
+      carnetCompte.textContent = 'Aucune page pour l’instant.';
+      return;
+    }
+    var c = compterStatuts();
+    var morceaux = [];
+    if (c.realise) morceaux.push(c.realise + ' réalisé' + (c.realise > 1 ? 's' : ''));
+    if (c.essaye) morceaux.push(c.essaye + ' essayé' + (c.essaye > 1 ? 's' : ''));
+    if (c.passe) morceaux.push(c.passe + ' passé' + (c.passe > 1 ? 's' : ''));
+    carnetCompte.textContent = pages.length + ' page' + (pages.length > 1 ? 's' : '') + ' — ' + morceaux.join(', ') + '.';
+  }
+
+  function rendreCarnet() {
+    if (!listeCarnet) return;
+    var pages = etat.modele.carnet.slice().sort(function (a, b) {
+      return String(b.cree).localeCompare(String(a.cree));
+    });
+
+    listeCarnet.replaceChildren.apply(listeCarnet, pages.map(creerPageCarnet));
+    listeCarnet.hidden = pages.length === 0;
+    if (carnetVide) carnetVide.hidden = pages.length !== 0;
+
+    majCompteCarnet(pages);
+    majPastilles();
+  }
+
+  if (listeCarnet) {
+    listeCarnet.addEventListener('change', function (evt) {
+      var input = evt.target;
+      if (!input || input.getAttribute('data-action') !== 'statut') return;
+      var pageLi = input.closest('[data-page]');
+      if (!pageLi) return;
+      var page = etat.modele.carnet.find(function (p) { return p.id === pageLi.getAttribute('data-page'); });
+      if (!page || !STATUTS[input.value]) return;
+      page.statut = input.value;
+      page.maj = horodatage();
+      sauvegarder();
+      var retour = pageLi.querySelector('[data-retour]');
+      if (retour) retour.textContent = 'Statut : ' + STATUTS[page.statut].toLowerCase() + '.';
+      majCompteCarnet(etat.modele.carnet);
+      annoncer('Statut mis à jour : ' + STATUTS[page.statut].toLowerCase() + '.');
+    });
+
+    listeCarnet.addEventListener('click', function (evt) {
+      var bouton = evt.target.closest('[data-action]');
+      if (!bouton) return;
+      var action = bouton.getAttribute('data-action');
+      var pageLi = bouton.closest('[data-page]');
+      if (!pageLi) return;
+      var id = pageLi.getAttribute('data-page');
+      var page = etat.modele.carnet.find(function (p) { return p.id === id; });
+      if (!page) return;
+
+      if (action === 'note') {
+        var textarea = pageLi.querySelector('textarea');
+        var texte = (textarea ? textarea.value : '').slice(0, 2000).trim();
+        var retour = pageLi.querySelector('[data-retour]');
+        if (!texte) {
+          if (retour) retour.textContent = 'Rien à enregistrer : la note est vide.';
+          annoncer('La note est vide.');
+          if (textarea) textarea.focus();
+          return;
+        }
+        page.note = texte;
+        page.maj = horodatage();
+        sauvegarder();
+        if (textarea) {
+          textarea.classList.add('note-transmise');
+          window.setTimeout(function () { textarea.classList.remove('note-transmise'); }, 950);
+        }
+        var questionAffichee = pageLi.querySelector('[data-question]');
+        if (questionAffichee) {
+          questionAffichee.hidden = true;
+          questionAffichee.setAttribute('aria-hidden', 'true');
+        }
+        if (retour) retour.textContent = 'Note enregistrée. Les questions restent dans le défi, pas dans le carnet.';
+        annoncer('Note enregistrée.');
+      }
+
+      if (action === 'supprimer') {
+        ouvrirDialogueSuppression(page);
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------------ 13. Suppression */
+
+  var dialogueSuppression = $('#dialogue-suppression');
+  var texteSuppression = $('[data-suppression-texte]');
+
+  function ouvrirDialogueSuppression(page) {
+    if (!dialogueSuppression) return;
+    etat.suppressionId = page.id;
+    var defi = trouverDefi(page.defiId);
+    if (texteSuppression) {
+      texteSuppression.textContent = '« ' + (defi ? defi.titre : 'cette page') + ' » sera retirée de ce navigateur. '
+        + 'Les notes saisies seront perdues. C’est définitif.';
+    }
+    if (typeof dialogueSuppression.showModal === 'function') dialogueSuppression.showModal();
+    else if (window.confirm('Supprimer cette page de carnet ?')) supprimerPage(page.id);
+  }
+
+  function supprimerPage(id) {
+    var avant = etat.modele.carnet.length;
+    etat.modele.carnet = etat.modele.carnet.filter(function (p) { return p.id !== id; });
+    if (etat.modele.carnet.length === avant) return;
+    sauvegarder();
+    rendreCarnet();
+    annoncer('Page supprimée du carnet.');
+  }
+
+  if (dialogueSuppression) {
+    dialogueSuppression.addEventListener('close', function () {
+      if (dialogueSuppression.returnValue === 'supprimer' && etat.suppressionId) {
+        supprimerPage(etat.suppressionId);
+      }
+      etat.suppressionId = null;
+    });
+  }
+
+  /* ------------------------------------------------------------------ 14. Import / export */
+
+  var dialogueImport = $('#dialogue-import');
+  var texteImport = $('[data-import-texte]');
+  var boutonImportConfirmer = $('[data-import-confirmer]');
+  var boutonImportAnnuler = $('[data-import-annuler]');
+  var champFichier = $('#fichier-import');
+
+  function construireExport() {
+    return {
+      application: 'DECLIC',
+      version: VERSION,
+      exporte: horodatage(),
+      favoris: etat.modele.favoris.slice(),
+      carnet: etat.modele.carnet.map(function (p) {
+        return { id: p.id, defiId: p.defiId, statut: p.statut, note: p.note, cree: p.cree, maj: p.maj };
+      })
+    };
+  }
+
+  function exporter() {
+    var donnees = construireExport();
+    var texte = JSON.stringify(donnees, null, 2);
+    var nom = 'declic-carnet-' + new Date().toISOString().slice(0, 10) + '.json';
+    try {
+      var blob = new Blob([texte], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var lien = el('a');
+      lien.href = url;
+      lien.download = nom;
+      document.body.appendChild(lien);
+      lien.click();
+      document.body.removeChild(lien);
+      window.setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      annoncer('Export préparé : ' + nom + '. ' + donnees.carnet.length + ' page(s), ' + donnees.favoris.length + ' favori(s).');
+    } catch (e) {
+      if (texteImport) texteImport.textContent = 'L’export a échoué dans ce navigateur. Voici le contenu à copier : ' + texte.slice(0, 1200);
+      if (dialogueImport && typeof dialogueImport.showModal === 'function') dialogueImport.showModal();
+    }
+  }
+
+  function validerImport(donnees) {
+    if (!donnees || typeof donnees !== 'object') return { ok: false, message: 'Le fichier ne contient pas un objet JSON lisible.' };
+    if (!Array.isArray(donnees.favoris) && !Array.isArray(donnees.carnet)) {
+      return { ok: false, message: 'Le fichier ne ressemble pas à un export DÉCLIC : ni « favoris » ni « carnet ».' };
+    }
+    var normalise = normaliserModele({
+      favoris: donnees.favoris,
+      carnet: donnees.carnet,
+      atelier: etat.modele.atelier
+    });
+    return {
+      ok: true,
+      modele: normalise.modele,
+      ignorees: normalise.ignorees,
+      apercu: {
+        favoris: normalise.modele.favoris.length,
+        pages: normalise.modele.carnet.length,
+        exporte: typeof donnees.exporte === 'string' ? donnees.exporte : null,
+        version: donnees.version !== undefined ? donnees.version : null,
+        ignorees: normalise.ignorees
+      }
+    };
+  }
+
+  function preparerApercuImport(fichier) {
+    if (!fichier) return;
+    if (fichier.size > 2 * 1024 * 1024) {
+      annoncer('Fichier trop volumineux : 2 Mo maximum.');
+      return;
+    }
+    var lecteur = new FileReader();
+    lecteur.onload = function () {
+      var donnees;
+      try {
+        donnees = JSON.parse(String(lecteur.result));
+      } catch (e) {
+        annoncer('Fichier illisible : ce n’est pas du JSON valide.');
+        if (texteImport) texteImport.textContent = 'Fichier illisible : ce n’est pas du JSON valide.';
+        return;
+      }
+      var verdict = validerImport(donnees);
+      if (!verdict.ok) {
+        annoncer(verdict.message);
+        if (texteImport) texteImport.textContent = verdict.message;
+        return;
+      }
+
+      etat.importEnAttente = verdict.modele;
+      var p = verdict.apercu;
+      if (texteImport) {
+        var fragment = document.createDocumentFragment();
+        fragment.appendChild(el('p', null, 'Ce fichier contient :'));
+        var ul = el('ul');
+        ul.appendChild(el('li', null, p.pages + ' page' + (p.pages > 1 ? 's' : '') + ' de carnet'));
+        ul.appendChild(el('li', null, p.favoris + ' favori' + (p.favoris > 1 ? 's' : '')));
+        if (p.exporte) ul.appendChild(el('li', null, 'exporté le ' + dateLisible(p.exporte)));
+        if (p.version !== null) ul.appendChild(el('li', null, 'version du format : ' + String(p.version)));
+        if (p.ignorees) ul.appendChild(el('li', null, p.ignorees + ' entrée(s) ignorée(s), car incomplètes ou inconnues'));
+        fragment.appendChild(ul);
+        fragment.appendChild(el('p', null, 'L’import remplace intégralement ton carnet et tes favoris actuels (' + etat.modele.carnet.length + ' page(s), ' + etat.modele.favoris.length + ' favori(s)).'));
+        texteImport.replaceChildren(fragment);
+      }
+      if (dialogueImport && typeof dialogueImport.showModal === 'function') dialogueImport.showModal();
+      else confirmerImport();
+    };
+    lecteur.onerror = function () {
+      annoncer('Lecture du fichier impossible.');
+    };
+    lecteur.readAsText(fichier);
+  }
+
+  function confirmerImport() {
+    if (!etat.importEnAttente) return;
+    etat.modele.favoris = etat.importEnAttente.favoris.slice();
+    etat.modele.carnet = etat.importEnAttente.carnet.slice();
+    etat.importEnAttente = null;
+    sauvegarder();
+    rendreCarnet();
+    rendreFavoris();
+    majPastilles();
+    if (dialogueImport && dialogueImport.open) dialogueImport.close();
+    annoncer('Import terminé : ' + etat.modele.carnet.length + ' page(s), ' + etat.modele.favoris.length + ' favori(s).');
+  }
+
+  var btnExport = $('#btn-export');
+  var btnImport = $('#btn-import');
+  if (btnExport) btnExport.addEventListener('click', exporter);
+  if (btnImport && champFichier) {
+    btnImport.addEventListener('click', function () { champFichier.click(); });
+    champFichier.addEventListener('change', function () {
+      var fichier = champFichier.files && champFichier.files[0];
+      preparerApercuImport(fichier);
+      champFichier.value = '';
+    });
+  }
+  if (dialogueImport) {
+    dialogueImport.addEventListener('close', function () {
+      if (!etat.importEnAttente) return;
+      etat.importEnAttente = null;
+      annoncer('Import annulé. Rien n’a été modifié.');
+    });
+  }
+  if (boutonImportConfirmer) boutonImportConfirmer.addEventListener('click', confirmerImport);
+  if (boutonImportAnnuler) {
+    boutonImportAnnuler.addEventListener('click', function () {
+      etat.importEnAttente = null;
+      if (dialogueImport && dialogueImport.open) dialogueImport.close();
+    });
+  }
+
+  /* ------------------------------------------------------------------ 15. Lien direct vers une idée */
+
+  function ouvrirDefiDepuisRoute(id) {
+    var defi = trouverDefi(id);
+    if (!defi) {
+      annoncer('Cette idée n’existe pas ou plus.');
+      if (els.invitation) els.invitation.textContent = 'Cette idée n’existe pas ou plus. Compose une nouvelle carte.';
+      window.location.hash = '#/trouver';
+      return;
+    }
+
+    reglerRadios({
+      duree: defi.duree,
+      categorie: defi.categorie,
+      contexte: defi.contextes[0]
+    });
+    majCarte();
+    etat.defiCourantId = defi.id;
+    rendreDefi(defi);
+    carte.setAttribute('data-etat', 'ouverte');
+    majBoutonOuvrir(true);
+    depliage.inert = false;
+    depliage.removeAttribute('aria-hidden');
+    els.actions.hidden = false;
+    etat.modele.atelier = {
+      duree: defi.duree, categorie: defi.categorie, contexte: defi.contextes[0],
+      defiId: defi.id, ouverte: true
+    };
+    sauvegarder();
+    annoncer('Idée ouverte : ' + defi.titre + '.');
+    var vue = $('[data-vue="trouver"]');
+    if (vue && vue.getBoundingClientRect().top < -4) window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }
+
+  /* ------------------------------------------------------------------ 16. Restauration & démarrage */
+
+  function restaurerAtelier() {
+    var a = etat.modele.atelier;
+    reglerRadios({ duree: a.duree, categorie: a.categorie, contexte: a.contexte });
+    majCarte();
+
+    if (a.ouverte && a.defiId) {
+      var defi = trouverDefi(a.defiId);
+      if (defi && correspondre(defi, a)) {
+        etat.defiCourantId = defi.id;
+        rendreDefi(defi);
+        carte.setAttribute('data-etat', 'ouverte');
+        majBoutonOuvrir(true);
+        depliage.inert = false;
+        depliage.removeAttribute('aria-hidden');
+        els.actions.hidden = false;
+        etat.modele.atelier.ouverte = true;
+        etat.modele.atelier.defiId = defi.id;
+        sauvegarder();
+        majPiedNote('Carte retrouvée telle que tu l’avais laissée.');
+      }
+    } else {
+      depliage.inert = true;
+      depliage.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function demarrer() {
+    var verdict = validerBibliotheque(BIBLIO);
+    BIBLIO = verdict.valides;
+
+    stockage.verifier();
+    if (!stockage.disponible) {
+      afficherBanniereStockage(stockage.raison + ' Tu peux continuer : le carnet et les favoris fonctionneront le temps de cette visite, et l’export JSON reste disponible.');
+    }
+
+    var brut = stockage.lire();
+    if (brut) {
+      try {
+        var lu = normaliserModele(JSON.parse(brut));
+        etat.modele = lu.modele;
+        if (lu.ignorees) {
+          afficherBanniereStockage(lu.ignorees + ' entrée(s) du carnet n’ont pas pu être relues (idée inconnue ou statut invalide). Elles ont été écartées ; le reste du carnet est intact.');
+        }
+      } catch (e) {
+        stockage.mettreDeCote(brut);
+        afficherBanniereStockage('Les données enregistrées dans ce navigateur étaient illisibles. Une copie brute a été conservée de côté, et le carnet repart vide.');
+        etat.modele = modeleVide();
+      }
+    }
+
+    if (!BIBLIO.length) {
+      afficherBanniereStockage('La bibliothèque de défis n’a pas pu être chargée (data/defis.js). Le site reste consultable, mais aucune idée ne peut être proposée.');
+      annoncer('Bibliothèque indisponible.');
+    } else if (verdict.rejets.length) {
+      console.warn('DÉCLIC — défis écartés :', verdict.rejets);
+    }
+
+    restaurerAtelier();
+    majPastilles();
+    rendreExplorer({ sansAnnonce: true, depuisRoute: true });
+    rendreFavoris();
+    rendreCarnet();
+
+    window.addEventListener('hashchange', router);
+    router();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer);
+  else demarrer();
 })();
